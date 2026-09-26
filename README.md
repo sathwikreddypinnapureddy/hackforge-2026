@@ -1,4 +1,4 @@
-# HackForge · CyberBot Phase 1
+# HackForge · CyberBot Phase 1.5
 
 HackForge is a security-first development workspace for hackathon teams, built
 during hackUMBC 2026. **The deterministic scanner determines what exists.** This
@@ -15,9 +15,9 @@ npm run dev
 
 `predev` prepares the two controlled Git fixtures automatically. Open
 [localhost:3000](http://localhost:3000), select **Vulnerable Demo**, and click
-**SCAN PROJECT**. Expect a score of **0** and **13 OPEN findings**: 2 critical,
-8 high, and 3 medium. The findings include masked credentials, tracked `.env`
-and `.env.local`, tracked sensitive configuration, and missing ignore rules.
+**SCAN PROJECT**. Expect a score of **37** and **4 OPEN findings**: 1 critical,
+2 high, and 1 medium. The findings are a masked fake OpenAI-style key, a tracked
+`.env`, a masked hardcoded API key, and a missing `.gitignore`.
 
 Select **Clean Demo** and scan again. Expect **100** and **0 findings**. This demo
 uses environment references and a secret-free `.env.example`, with working
@@ -61,6 +61,8 @@ detection, Git checks, and scoring. Secrets are fully redacted **before** findin
 are created; source lines and raw credential values are never returned or logged.
 Provider/assignment overlap is deduplicated within one occurrence. A tracked
 environment file and a literal within that file are separate verified risks.
+Missing `.gitignore` produces one finding; incomplete environment ignore rules
+are checked only when the root `.gitignore` exists.
 
 Only Git `ls-files --cached` and `check-ignore --no-index` run during a scan.
 Commands use a fixed executable with argument arrays, no shell, disabled optional
@@ -140,4 +142,4 @@ failures, no console logs, and unchanged source and Git metadata after rescans.
   remain stable during scans. Scores describe only the Phase 1 checks and are
   not proof that a project is secure.
 
-Phase 1 ends here. Gemini and other integrations are intentionally absent.
+Phase 1.5 ends here. Gemini and other integrations are intentionally absent.

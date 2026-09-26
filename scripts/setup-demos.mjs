@@ -9,7 +9,7 @@ import { deflateSync } from "node:zlib";
 // Fixed manifests keep tracked .env checks reproducible after a fresh clone.
 const repository = fileURLToPath(new URL("../", import.meta.url));
 const manifests = {
-  "vulnerable-demo": [".env", ".env.local", "README.md", "config/secrets.json", "src/app.ts", "src/config.ts"],
+  "vulnerable-demo": [".env", "README.md", "src/app.ts", "src/config.ts"],
   "clean-demo": [".env.example", ".gitignore", "README.md", "src/app.ts", "src/config.ts"],
 };
 

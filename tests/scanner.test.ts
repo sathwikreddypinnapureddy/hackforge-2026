@@ -117,6 +117,7 @@ test("quoted reference-shaped strings are still literal credentials", () => {
 });
 
 test("scoring applies exact severity weights and clamps at zero", () => {
+  assert.deepEqual(PENALTIES, { CRITICAL: 25, HIGH: 15, MEDIUM: 8, LOW: 3 });
   assert.equal(calculateScore([]), 100);
   for (const severity of ["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const) {
     assert.equal(calculateScore([finding(severity)]), 100 - PENALTIES[severity]);
@@ -160,15 +161,18 @@ test("containment checks reject sibling-prefix and parent paths", () => {
   assert.ok(!isContained("/tmp/demo", "/tmp/demo/../outside"));
 });
 
-test("vulnerable demo detects secrets, tracked env files, sensitive config, and missing ignores", async () => {
+test("vulnerable demo has four representative findings with unchanged scoring penalties", async () => {
   const result = await scanProject("vulnerable-demo");
-  assert.equal(result.score, 0);
-  assert.deepEqual(result.counts, { CRITICAL: 2, HIGH: 8, MEDIUM: 3, LOW: 0 });
-  assert.equal(result.findings.length, 13);
-  assert.equal(result.findings.filter((f) => f.title === "Environment file tracked by Git").length, 2);
-  for (const title of ["Missing .gitignore", "Incomplete environment ignore rules", "Sensitive configuration tracked by Git", "Hardcoded API key", "Hardcoded password", "Hardcoded secret or token", "AWS access key ID exposed", "GitHub-style token exposed", "OpenAI-style key exposed"]) {
-    assert.ok(result.findings.some((f) => f.title === title), `Missing rule: ${title}`);
-  }
+  assert.equal(result.score, 37);
+  assert.deepEqual(result.counts, { CRITICAL: 1, HIGH: 2, MEDIUM: 1, LOW: 0 });
+  assert.equal(result.findings.length, 4);
+  assert.deepEqual(result.findings.map((f) => [f.title, f.severity, f.filePath]).sort(), [
+    ["OpenAI-style key exposed", "CRITICAL", ".env"],
+    ["Environment file tracked by Git", "HIGH", ".env"],
+    ["Hardcoded API key", "HIGH", "src/config.ts"],
+    ["Missing .gitignore", "MEDIUM", ".gitignore"],
+  ].sort());
+  assert.ok(result.findings.filter((f) => f.category === "SECRET").every((f) => f.maskedSample === "[REDACTED]"));
   assert.ok(result.findings.every((f) => f.status === "OPEN" && !f.filePath.startsWith("/")));
   assert.ok(!result.findings.some((f) => f.filePath === "src/app.ts" || f.filePath === "README.md"));
   assertSanitized(result);
@@ -233,7 +237,7 @@ test("POST rejects traversal, extra fields, malformed JSON, and oversized bodies
   }
 });
 
-test("Git ignore evaluation detects ineffective negated rules", async () => {
+test("Git ignore evaluation distinguishes missing, incomplete, negated, and complete rules", async () => {
   const root = path.join(process.cwd(), "demo-repos", "clean-demo");
   const gitDir = path.join(process.cwd(), "demo-repos", ".git-data", "clean-demo");
   const ignoredFiles = await readSourceFiles(root);
@@ -241,9 +245,15 @@ test("Git ignore evaluation detects ineffective negated rules", async () => {
   // An isolated work tree reuses the controlled index using read-only git operations.
   const temp = await mkdtemp(path.join(os.tmpdir(), "hackforge-ignore-"));
   try {
-    await writeFile(path.join(temp, ".gitignore"), ".env\n.env.*\n!.env.local\n");
-    const findings = await inspectGit(temp, gitDir, await readSourceFiles(temp));
-    assert.ok(findings.some((f) => f.title === "Incomplete environment ignore rules"));
+    const missing = await inspectGit(temp, gitDir, await readSourceFiles(temp));
+    assert.deepEqual(missing.map((f) => f.title), ["Missing .gitignore"]);
+    for (const rules of ["", ".env\n", ".env.*\n", "/.env\n/.env.*\n", ".env\n.env.*\n!.env.local\n"]) {
+      await writeFile(path.join(temp, ".gitignore"), rules);
+      const findings = await inspectGit(temp, gitDir, await readSourceFiles(temp));
+      assert.deepEqual(findings.map((f) => f.title), ["Incomplete environment ignore rules"]);
+    }
+    await writeFile(path.join(temp, ".gitignore"), ".env\n.env.*\n!.env.example\n");
+    assert.deepEqual(await inspectGit(temp, gitDir, await readSourceFiles(temp)), []);
   } finally { await rm(temp, { recursive: true, force: true }); }
 });
 

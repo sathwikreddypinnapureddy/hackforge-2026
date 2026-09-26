@@ -53,6 +53,7 @@ export async function inspectGit(root: string, gitDir: string, files: readonly S
       description: "The project root has no .gitignore file.", filePath: ".gitignore",
       remediation: "Create a .gitignore with .env, .env.*, node_modules/, and build-output patterns. Allow only secret-free environment templates.",
     }));
+    return findings;
   }
 
   // Ask Git to evaluate real ignore semantics, including negations and nested rules.

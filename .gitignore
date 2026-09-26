@@ -35,7 +35,6 @@ yarn-error.log*
 
 # Only these controlled fixtures contain intentional, nonfunctional test strings.
 !demo-repos/vulnerable-demo/.env
-!demo-repos/vulnerable-demo/.env.local
 !demo-repos/clean-demo/.env.example
 demo-repos/.git-data/
 
