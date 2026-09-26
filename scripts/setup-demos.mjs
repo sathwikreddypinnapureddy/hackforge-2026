@@ -39,6 +39,15 @@ for (const [target, manifest] of Object.entries(manifests)) {
   await safeDirectory(root);
   await safeDirectory(metadataBase);
   await safeDirectory(gitDir);
+  // Preserve current remediation state across dev/test/build restarts.
+  // Reset is an explicit confirmed API action, never an automatic lifecycle step.
+  try {
+    const existing = await lstat(path.join(gitDir, "index"));
+    if (!existing.isFile() || existing.isSymbolicLink()) throw new Error("Unsafe fixture index.");
+    continue;
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
   await safeDirectory(path.join(gitDir, "objects"));
   await safeDirectory(path.join(gitDir, "refs"));
   await safeDirectory(path.join(gitDir, "refs", "heads"));

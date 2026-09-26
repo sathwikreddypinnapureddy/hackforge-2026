@@ -1,8 +1,9 @@
-# HackForge · CyberBot Phase 2
+# HackForge · CyberBot Phase 3
 
 HackForge is a security-first development workspace for hackathon teams, built
 during hackUMBC 2026. **The deterministic scanner determines what exists.** This
-phase adds Gemini explanations of verified findings. Gemini never discovers
+phase adds confirmed demo remediation, deterministic rescanning, and before/after
+verification while preserving Gemini explanations. Gemini never discovers
 findings or controls severity, scores, or status. There is no authentication,
 database, or other sponsor integration.
 
@@ -93,7 +94,8 @@ only, stored under the ignored `demo-repos/.git-data/<target>/` directories.
 The scanner supplies Git's directory and worktree explicitly; the source
 fixtures remain ordinary files that can be committed in HackForge. Preparation
 runs before dev, build, and test, or explicitly with
-`npm run setup:demos`. Setup is not called by the API or scanner.
+`npm run setup:demos`. Existing indexes are preserved, so restarting or building
+does not undo remediation. Setup is not called by the API or scanner.
 
 ## API
 
@@ -113,6 +115,20 @@ has a stable ID, category, severity, title, description, relative file path,
 optional 1-based line number, optional masked sample, remediation, status, and
 penalty. Scan IDs and timestamps change on each scan; identical inputs produce
 identical findings and scores.
+
+`POST /api/fix-demo` accepts exactly three fields:
+
+```json
+{ "target": "vulnerable-demo", "action": "apply-safe-fixes", "confirmed": true }
+```
+
+The only other action is `reset-vulnerable-demo`, also requiring `confirmed: true`.
+Content type must be JSON; cross-origin requests and URL query parameters are
+rejected. No paths, commands, arbitrary content, prompts, or additional fields
+are accepted. Missing confirmation or invalid input returns 400; unsafe or
+unexpected fixture states return a sanitized 503. Mutation responses contain no
+scores or resolved finding IDs. Run `/api/scan` afterward to verify.
+
 
 `POST /api/scan` also sets a random `HttpOnly; SameSite=Strict` session cookie
 (`Secure` on HTTPS). The latest successful scan for that session is eligible for
@@ -160,8 +176,8 @@ and session cookies are excluded. Metadata text is trusted only because it comes
 from the current scanner's fixed rule strings; new scanner rules must preserve
 that invariant. Request bodies never supply this metadata.
 
-The official SDK calls `gemini-2.5-flash` with a fixed instruction, JSON Schema,
-no tools, and a 10-second deadline. Requests are not retried. Validation rejects
+The official SDK calls `gemini-3.8-flash` with a fixed instruction, JSON Schema,
+no tools, and a 40-second deadline. Requests are not retried. Validation rejects
 missing or extra fields, wrong types, blank or oversized text, and invalid step
 arrays. Missing configuration, SDK errors, timeouts, blocked output, malformed
 JSON, and schema failures fall back locally. Exceptions and request payloads
@@ -177,11 +193,15 @@ Review the advice before acting. A deterministic rescan remains necessary.
 ## Scoring and statuses
 
 Score is `max(0, 100 - active penalties)`: CRITICAL 25, HIGH 15, MEDIUM 8, LOW 3.
-All Phase 1 findings default to OPEN. OPEN and ACCEPTED_RISK always apply their
+All emitted findings default to OPEN. OPEN and ACCEPTED_RISK always apply their
 penalties. A RESOLVED label alone cannot waive a penalty: trusted verified-rescan
 evidence is required. A FALSE_POSITIVE label requires evidence of explicit user
-action. There is no status mutation endpoint, waiver UI, or persistence in Phase
-2. The API accepts no status or scoring-evidence input.
+action. There is no status mutation endpoint or waiver UI. The API accepts no
+status or scoring-evidence input. Before/after comparison uses separate actual
+scan responses of the same target, requires a later scan, and identifies
+disappeared IDs by set difference. Findings emitted in the new scan remain OPEN.
+The current scan score is calculated from its actual findings; clicking a fix
+or reading Gemini guidance cannot change it.
 
 ## Validation
 
@@ -204,9 +224,51 @@ expiry and eviction, rescan invalidation (including in-flight requests), cached
 requests, missing-key/invalid-output/error/timeout fallback, and unchanged scan
 results after Gemini failure. All Gemini calls are mocked; a test network guard
 prevents real HTTP calls. `--conditions=react-server` enables the server-only
-modules in the Node test runner. Existing Phase 1 tests are unchanged.
+modules in the Node test runner. Existing scanner and Gemini tests remain in place.
 
-## Manual Phase 2 checks
+## Judge demo sequence (Phase 3)
+
+1. Select **Vulnerable Demo**. Click **Reset Vulnerable Demo** and confirm to
+   establish the known initial state, then **SCAN PROJECT**: 37 / 100, 4 findings.
+2. Click **Explain with Gemini** on a finding. Guidance must leave the score and
+   findings unchanged; missing Gemini configuration uses the existing fallback.
+3. Click **Apply Safe Demo Fixes** and confirm. The previous scan still shows
+   37 and 4 findings; the UI says verification is pending.
+4. Click **Rescan & Verify**. The new deterministic scan shows 100 and 0 findings.
+   Before vs After shows **+63**, the four disappeared IDs, and no remaining
+   findings. Scores and counts come from the two actual scan responses.
+5. Click **Reset Vulnerable Demo**, confirm, and scan again. The same 37, four
+   finding IDs, and severities return. Gemini explanations work for the new scan.
+   Repeat steps 2–5 for each judge.
+
+The fix writes only four allowlisted files inside the vulnerable fixture:
+`src/config.ts` uses `process.env.API_KEY`; `.env` retains a comment with no
+credential literal; `.gitignore` protects root and nested environment files;
+`.env.example` has empty credential values. It removes only `.env` from the
+controlled fixture's separate Git v2 index. Reset restores the known fake config
+and environment file, removes only the known generated ignore/template files,
+and restores the fake `.env` index entry. No shell or mutating Git command runs.
+
+Unexpected file contents (including real credentials), extra fixture files,
+symlinks, hardlinked mutation files, redirected directories/metadata, or an
+unsupported index fail closed. HackForge source/config, its `.env.local`, its
+Git index/history, and Clean Demo are outside the mutation boundary. The only
+metadata mutation is `demo-repos/.git-data/vulnerable-demo/index`. Git objects,
+refs, HEAD, and all history remain untouched. The fixture starts with staged fake
+files and an unborn branch; it does not require an actual credential commit.
+
+**Credential rotation and Git history review recommended.** Verification describes
+only the current fixture; it does not certify historical credential removal.
+The UI requires explicit browser confirmation for both fixes and reset. Scans
+and mutations share an in-process queue so scans cannot observe intermediate
+API mutations. This requires a single Node process and stable local filesystem.
+
+Phase 3 tests perform three reset/fix/rescan cycles in isolated fixture copies,
+check file and metadata hashes outside the allowlist (including real HackForge),
+verify actual scores and stable IDs, reject unsafe input and redirected files,
+check no console logging, and exercise mocked Gemini before and after scans.
+
+## Manual Gemini checks
 
 1. Run `npm run dev` with the existing server-side `GEMINI_API_KEY`. Scan
    Vulnerable Demo: confirm 4 OPEN findings and score 37.
@@ -254,5 +316,5 @@ modules in the Node test runner. Existing Phase 1 tests are unchanged.
   remain stable during scans. Scores describe only the Phase 1 checks and are
   not proof that a project is secure.
 
-Phase 2 ends here. Tiger Data, Backboard, DigitalOcean, and other integrations
+Phase 3 ends here. Tiger Data, Backboard, DigitalOcean, and other integrations
 are intentionally absent.

@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { SEVERITIES } from "../lib/scanner/types.ts";
 import type { ScanResult, ScanTarget } from "../lib/scanner/types.ts";
+import { compareScans } from "../lib/demo/comparison.ts";
 import { FindingExplanation } from "./components/finding-explanation.tsx";
 
 const TARGET_LABELS: Record<ScanTarget, string> = {
@@ -17,11 +18,16 @@ export default function Home() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function scan(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const [before, setBefore] = useState<ScanResult | null>(null);
+  const [comparison, setComparison] = useState<ReturnType<typeof compareScans> | null>(null);
+  const [fixed, setFixed] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function scan(event?: FormEvent<HTMLFormElement>, verify = false) {
+    event?.preventDefault();
     setScanning(true);
     setError(null);
-    setResult(null);
+    setComparison(null);
     try {
       const response = await fetch("/api/scan", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -33,9 +39,43 @@ export default function Home() {
           : "The scan could not be completed. Try again.");
         return;
       }
-      setResult(await response.json() as ScanResult);
+      const next = await response.json() as ScanResult;
+      if ((verify || fixed) && (before ?? result)) {
+        setComparison(compareScans((before ?? result)!, next));
+        setNotice("Rescan complete. CyberBot verified the comparison below from deterministic findings.");
+      } else setBefore(null);
+      setResult(next);
     } catch {
       setError("Cannot reach CyberBot. Check that the development server is running and try again.");
+    } finally { setScanning(false); }
+  }
+
+  async function demoAction(action: "apply-safe-fixes" | "reset-vulnerable-demo") {
+    const reset = action === "reset-vulnerable-demo";
+    const confirmation = reset
+      ? "Reset only Vulnerable Demo to its known fake-vulnerable state? This removes the generated demo ignore rules and template."
+      : "Apply safe fixes only inside Vulnerable Demo? This replaces fake credentials, clears the demo .env, untracks it from the controlled index, and adds ignore rules and a secret-free template. Git history will remain unchanged.";
+    if (!window.confirm(confirmation)) return;
+    setScanning(true);
+    setError(null);
+    setComparison(null);
+    try {
+      const response = await fetch("/api/fix-demo", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: "vulnerable-demo", action, confirmed: true }),
+      });
+      if (!response.ok) {
+        setError("Demo action unavailable. Only known controlled fixture states can be changed. Rescan to check the current state.");
+        return;
+      }
+      setNotice(reset
+        ? "Vulnerable Demo restored. Scan again to start a new demonstration."
+        : "Safe demo fixes applied. Findings remain unverified until Rescan & Verify completes.");
+      setBefore(reset ? null : result);
+      setFixed(!reset);
+      if (reset) setResult(null);
+    } catch {
+      setError("Cannot reach CyberBot. Rescan before trusting the fixture state.");
     } finally { setScanning(false); }
   }
 
@@ -43,7 +83,7 @@ export default function Home() {
     <main className="workspace">
       <header className="workspace-header">
         <div>
-          <p className="eyebrow">hackUMBC 2026 · Phase 2</p>
+          <p className="eyebrow">hackUMBC 2026 · Phase 3</p>
           <h1>HackForge<span className="brand-dot">.</span></h1>
         </div>
         <span className="phase-badge">CyberBot / deterministic scanner</span>
@@ -56,13 +96,17 @@ export default function Home() {
           Ask Gemini to explain a verified finding and its remediation.</p>
       </section>
 
-      <form className="scan-controls panel" onSubmit={scan}>
+      <form className="scan-controls panel" onSubmit={(event) => { void scan(event); }}>
         <div className="target-control">
           <label htmlFor="target">Project</label>
           <select id="target" value={target} disabled={scanning} onChange={(event) => {
             setTarget(event.target.value as ScanTarget);
             setResult(null);
             setError(null);
+            setBefore(null);
+            setComparison(null);
+            setFixed(false);
+            setNotice(null);
           }}>
             <option value="vulnerable-demo">Vulnerable Demo</option>
             <option value="clean-demo">Clean Demo</option>
@@ -70,6 +114,37 @@ export default function Home() {
         </div>
         <button type="submit" disabled={scanning}>{scanning ? "SCANNING…" : "SCAN PROJECT"}</button>
       </form>
+
+      {target === "vulnerable-demo" && (
+        <section className="demo-workflow panel" aria-label="Verified demo remediation">
+          <h2>Fix, rescan, verify.</h2>
+          <p>Only the controlled fake fixture can be changed. Confirmation is required.
+            Credential rotation and Git history review recommended.</p>
+          <div className="demo-actions">
+            <button disabled={scanning || !result || fixed} onClick={() => void demoAction("apply-safe-fixes")}>Apply Safe Demo Fixes</button>
+            <button disabled={scanning || !result} onClick={() => void scan(undefined, true)}>Rescan &amp; Verify</button>
+            <button className="secondary-button" disabled={scanning} onClick={() => void demoAction("reset-vulnerable-demo")}>Reset Vulnerable Demo</button>
+          </div>
+          {notice && <p role="status">{notice}</p>}
+        </section>
+      )}
+
+      {comparison && (
+        <section className="comparison panel" aria-label="Before versus after verification" aria-live="polite">
+          <h2>Before vs After</h2>
+          <div className="comparison-grid">
+            <div><p className="eyebrow">BEFORE</p><strong>Score: {comparison.previousScore}</strong><p>{comparison.previousCount} findings</p></div>
+            <div><p className="eyebrow">AFTER</p><strong>Score: {comparison.newScore}</strong><p>{comparison.newCount} findings</p></div>
+          </div>
+          <p className="verified-improvement">Verified improvement: {comparison.improvement >= 0 ? "+" : ""}{comparison.improvement}</p>
+          <p>CyberBot compared deterministic scans. Disappeared IDs are verified resolved in the current fixture state.</p>
+          <h3>Disappeared finding IDs ({comparison.disappeared.length})</h3>
+          {comparison.disappeared.length === 0 ? <p>None.</p> : <ul>{comparison.disappeared.map((finding) => <li key={finding.id}>{finding.title} · <code>{finding.id}</code></li>)}</ul>}
+          <h3>Findings in the new scan ({comparison.remaining.length})</h3>
+          {comparison.remaining.length === 0 ? <p>None remain.</p> : <ul>{comparison.remaining.map((finding) => <li key={finding.id}>{finding.title} · <code>{finding.id}</code> · OPEN</li>)}</ul>}
+          <p>Credential rotation and Git history review recommended. Current-state verification does not certify Git history is clean.</p>
+        </section>
+      )}
 
       {error && <p role="alert" className="error-message">{error}</p>}
 
@@ -100,7 +175,7 @@ export default function Home() {
           {scanning && <div className="empty-state panel" role="status">Checking files and Git tracking…</div>}
           {!scanning && !result && <div className="empty-state panel">Select a demo and scan to get started. Both demos use only nonfunctional test credentials.</div>}
           {result && result.findings.length === 0 && (
-            <div className="empty-state panel clean-state">No findings detected by Phase 1 rules. Score: 100 / 100.</div>
+            <div className="empty-state panel clean-state">No findings detected by deterministic rules. Score: {result.score} / 100.</div>
           )}
           {result?.findings.map((finding) => (
             <article className="finding panel" key={`${result.scanId}:${finding.id}`}>
@@ -124,7 +199,7 @@ export default function Home() {
       </div>
 
       <footer>Score starts at 100. Critical −25 · High −15 · Medium −8 · Low −3.
-        All Phase 1 findings are OPEN. Accepting a risk keeps its penalty.</footer>
+        Emitted findings stay OPEN. Only a later deterministic scan can verify disappearance.</footer>
     </main>
   );
 }

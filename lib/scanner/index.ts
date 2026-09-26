@@ -1,3 +1,4 @@
+import { withDemoLock } from "../demo/lock.ts";
 import { randomUUID } from "node:crypto";
 import { readSourceFiles } from "./files.ts";
 import { inspectGit } from "./git.ts";
@@ -7,7 +8,11 @@ import { InvalidTargetError, resolveTarget, ScanUnavailableError } from "./targe
 import { SEVERITIES } from "./types.ts";
 import type { ScanResult } from "./types.ts";
 
-export async function scanProject(target: unknown): Promise<ScanResult> {
+export function scanProject(target: unknown): Promise<ScanResult> {
+  return withDemoLock(() => scanUnlocked(target));
+}
+
+async function scanUnlocked(target: unknown): Promise<ScanResult> {
   try {
     const resolved = await resolveTarget(target);
     const files = await readSourceFiles(resolved.root);

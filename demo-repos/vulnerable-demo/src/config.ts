@@ -1,4 +1,4 @@
-// Every credential in this fixture is fake and nonfunctional.
+// Demo credentials are supplied through the environment.
 export const config = {
-  apiKey: "fake-testonly-api-key-00000000",
+  apiKey: process.env.API_KEY,
 };
