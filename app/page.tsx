@@ -16,6 +16,7 @@ export default function Home() {
   const [target, setTarget] = useState<ScanTarget>("vulnerable-demo");
   const [result, setResult] = useState<ScanResult | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [activity, setActivity] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [before, setBefore] = useState<ScanResult | null>(null);
@@ -26,6 +27,8 @@ export default function Home() {
   async function scan(event?: FormEvent<HTMLFormElement>, verify = false) {
     event?.preventDefault();
     setScanning(true);
+    setActivity(verify || fixed ? "SAI is verifying the fixes..." : "SAI is checking your project...");
+    setNotice(null);
     setError(null);
     setComparison(null);
     try {
@@ -42,12 +45,12 @@ export default function Home() {
       const next = await response.json() as ScanResult;
       if ((verify || fixed) && (before ?? result)) {
         setComparison(compareScans((before ?? result)!, next));
-        setNotice("Rescan complete. SAI Security Scanner verified the comparison below from deterministic findings.");
+        setNotice("Verification complete.");
       } else setBefore(null);
       setResult(next);
     } catch {
       setError("Cannot reach SAI Security Scanner. Check that the development server is running and try again.");
-    } finally { setScanning(false); }
+    } finally { setScanning(false); setActivity(null); }
   }
 
   async function demoAction(action: "apply-safe-fixes" | "reset-vulnerable-demo") {
@@ -57,6 +60,8 @@ export default function Home() {
       : "Apply safe fixes only inside Vulnerable Demo? This replaces fake credentials, clears the demo .env, untracks it from the controlled index, and adds ignore rules and a secret-free template. Git history will remain unchanged.";
     if (!window.confirm(confirmation)) return;
     setScanning(true);
+    setActivity(reset ? "Resetting the demo..." : "Applying safe demo fixes...");
+    setNotice(null);
     setError(null);
     setComparison(null);
     try {
@@ -70,137 +75,154 @@ export default function Home() {
       }
       setNotice(reset
         ? "Vulnerable Demo restored. Scan again to start a new demonstration."
-        : "Safe demo fixes applied. Findings remain unverified until Rescan & Verify completes.");
+        : "Fixes applied. Rescan to verify the result.");
       setBefore(reset ? null : result);
       setFixed(!reset);
       if (reset) setResult(null);
     } catch {
       setError("Cannot reach SAI Security Scanner. Rescan before trusting the fixture state.");
-    } finally { setScanning(false); }
+    } finally { setScanning(false); setActivity(null); }
   }
 
   return (
     <main className="workspace">
+      <a className="skip-link" href="#scan-project">Skip to project scan</a>
       <header className="workspace-header">
-        <div>
-          <p className="eyebrow">hackUMBC 2026 · Phase 3</p>
-          <h1>HackForge<span className="brand-dot">.</span></h1>
-        </div>
-        <span className="phase-badge" role="status">{scanning ? "SAI Working…" : "SAI Ready"}</span>
+        <div className="brand"><span className="brand-mark" aria-hidden="true">H</span><div>
+          <p className="brand-name">HackForge<span className="brand-dot">.</span></p>
+          <p className="tagline">Build Fast. Ship Secure.</p>
+        </div></div>
+        <span className="ready-badge"><span aria-hidden="true" className="status-dot" />{scanning ? "SAI Working…" : "SAI Ready"}</span>
       </header>
 
       <section className="intro">
-        <h2>Know what&apos;s in your project.</h2>
-        <p>Scan a controlled demo for exposed credentials and Git hygiene issues.
-          SAI Security Scanner uses deterministic rules. Credential values are masked on the server.
-          Ask SAI Assistant to explain a verified finding and its remediation.</p>
-        <p>SAI Scanner finds it. SAI Assistant explains it.</p>
+        <p className="eyebrow">Security-first development workspace</p>
+        <h1>Check your project<br className="desktop-break" /> before you ship.</h1>
+        <p>Find exposed credentials, unsafe Git files, and other security problems before submission.</p>
       </section>
 
-      <form className="scan-controls panel" onSubmit={(event) => { void scan(event); }}>
-        <div className="target-control">
-          <label htmlFor="target">Project</label>
-          <select id="target" value={target} disabled={scanning} onChange={(event) => {
-            setTarget(event.target.value as ScanTarget);
-            setResult(null);
-            setError(null);
-            setBefore(null);
-            setComparison(null);
-            setFixed(false);
-            setNotice(null);
-          }}>
-            <option value="vulnerable-demo">Vulnerable Demo</option>
-            <option value="clean-demo">Clean Demo</option>
-          </select>
+      <nav className="progress-flow" aria-label="Security workflow">
+        <ol>{["Scan", "Understand", "Fix", "Verify"].map((step, index) => (
+          <li key={step}><span className="step-number" aria-hidden="true">{index + 1}</span><span>{step}</span></li>
+        ))}</ol>
+        <p>SAI Scanner finds it. SAI Assistant explains it.</p>
+      </nav>
+
+      <section className="scan-card panel" id="scan-project" aria-labelledby="scan-heading">
+        <h2 id="scan-heading">Scan your project</h2>
+        <p>Check for exposed credentials, unsafe Git files, and other security risks.</p>
+        <form className="scan-controls" onSubmit={(event) => { void scan(event); }}>
+          <div className="target-control">
+            <label htmlFor="target">Project</label>
+            <select id="target" value={target} disabled={scanning} onChange={(event) => {
+              setTarget(event.target.value as ScanTarget);
+              setResult(null); setError(null); setBefore(null); setComparison(null); setFixed(false); setNotice(null);
+            }}>
+              <option value="vulnerable-demo">Vulnerable Demo</option>
+              <option value="clean-demo">Clean Demo</option>
+            </select>
+          </div>
+          <button type="submit" disabled={scanning}>Scan Project <span aria-hidden="true">→</span></button>
+        </form>
+        <p className="helper">Two controlled demo projects. All demo credentials are nonfunctional.</p>
+        <div role="status" aria-live="polite" className="scan-status">
+          {activity || (result ? `SAI found ${result.findings.length} verified security ${result.findings.length === 1 ? "issue" : "issues"} in ${TARGET_LABELS[result.target]}.` : "Choose a project to get started.")}
         </div>
-        <button type="submit" disabled={scanning}>{scanning ? "SCANNING…" : "SCAN PROJECT"}</button>
-      </form>
-
-      {target === "vulnerable-demo" && (
-        <section className="demo-workflow panel" aria-label="Verified demo remediation">
-          <h2>Fix, rescan, verify.</h2>
-          <p>Only the controlled fake fixture can be changed. Confirmation is required.
-            Credential rotation and Git history review recommended.</p>
-          <div className="demo-actions">
-            <button disabled={scanning || !result || fixed} onClick={() => void demoAction("apply-safe-fixes")}>Apply Safe Demo Fixes</button>
-            <button disabled={scanning || !result} onClick={() => void scan(undefined, true)}>Rescan &amp; Verify</button>
-            <button className="secondary-button" disabled={scanning} onClick={() => void demoAction("reset-vulnerable-demo")}>Reset Vulnerable Demo</button>
-          </div>
-          {notice && <p role="status">{notice}</p>}
-        </section>
-      )}
-
-      {comparison && (
-        <section className="comparison panel" aria-label="Before versus after verification" aria-live="polite">
-          <h2>Before vs After</h2>
-          <div className="comparison-grid">
-            <div><p className="eyebrow">BEFORE</p><strong>Score: {comparison.previousScore}</strong><p>{comparison.previousCount} findings</p></div>
-            <div><p className="eyebrow">AFTER</p><strong>Score: {comparison.newScore}</strong><p>{comparison.newCount} findings</p></div>
-          </div>
-          <p className="verified-improvement">Verified improvement: {comparison.improvement >= 0 ? "+" : ""}{comparison.improvement}</p>
-          <p>SAI Security Scanner compared deterministic scans. Disappeared IDs are verified resolved in the current fixture state.</p>
-          <h3>Disappeared finding IDs ({comparison.disappeared.length})</h3>
-          {comparison.disappeared.length === 0 ? <p>None.</p> : <ul>{comparison.disappeared.map((finding) => <li key={finding.id}>{finding.title} · <code>{finding.id}</code></li>)}</ul>}
-          <h3>Findings in the new scan ({comparison.remaining.length})</h3>
-          {comparison.remaining.length === 0 ? <p>None remain.</p> : <ul>{comparison.remaining.map((finding) => <li key={finding.id}>{finding.title} · <code>{finding.id}</code> · OPEN</li>)}</ul>}
-          <p>Credential rotation and Git history review recommended. Current-state verification does not certify Git history is clean.</p>
-        </section>
-      )}
-
+      </section>
       {error && <p role="alert" className="error-message">{error}</p>}
 
-      <div aria-live="polite" aria-busy={scanning}>
-        <section className="score-grid" aria-label="Security posture">
-          <div className="posture panel">
-            <p className="eyebrow">Security posture score</p>
-            <div className={`score ${result && result.score < 70 ? "score-warning" : ""}`}>
-              {result ? result.score : "—"}<span>/ 100</span>
-            </div>
-            <p>{result ? `${TARGET_LABELS[result.target]} · SAI found ${result.findings.length} verified security ${result.findings.length === 1 ? "issue" : "issues"}.` : "Run a scan to see verified findings."}</p>
+      <section className="score-grid" aria-label="Security overview" aria-busy={scanning}>
+        <div className="posture panel">
+          <h2>Project Security Score</h2>
+          <div className={`score ${result && result.score < 100 ? "score-warning" : ""}`}>
+            {result ? result.score : "—"}<span>/ 100</span>
           </div>
+          <p className="score-status">{result ? (result.findings.length === 0 ? "Ready to ship" : "Needs attention") : "Awaiting your first scan"}</p>
+          <p className="helper">Score reflects only checks currently supported by HackForge.</p>
+        </div>
+        <div className="severity-summary">
+          <h2>Severity summary</h2>
           <div className="severity-grid">
             {SEVERITIES.map((severity) => (
               <div key={severity} className="severity-count panel">
-                <span className={`severity severity-${severity.toLowerCase()}`}>{severity}</span>
+                <span className={`severity severity-${severity.toLowerCase()}`}>{severity.charAt(0) + severity.slice(1).toLowerCase()}</span>
                 <strong>{result ? result.counts[severity] : "—"}</strong>
               </div>
             ))}
           </div>
-        </section>
+          <p className="helper">Verified findings, grouped by severity.</p>
+        </div>
+      </section>
 
-        <section className="findings-section" aria-label="Scan findings">
-          <div className="section-heading">
-            <h2>Findings</h2>
-            {result && <span>{result.findings.length} open</span>}
-          </div>
-          {scanning && <div className="empty-state panel" role="status">Checking files and Git tracking…</div>}
-          {!scanning && !result && <div className="empty-state panel">Select a demo and scan to get started. Both demos use only nonfunctional test credentials.</div>}
-          {result && result.findings.length === 0 && (
-            <div className="empty-state panel clean-state">No findings detected by deterministic rules. Score: {result.score} / 100.</div>
-          )}
-          {result?.findings.map((finding) => (
-            <article className="finding panel" key={`${result.scanId}:${finding.id}`}>
-              <div className="finding-header">
-                <span className={`severity severity-${finding.severity.toLowerCase()}`}>{finding.severity}</span>
-                <span className="finding-category">{finding.category === "SECRET" ? "Secret detection" : "Git hygiene"}</span>
-                <span className="finding-status">{finding.status} · −{finding.penalty} pts</span>
-              </div>
-              <h3>{finding.title}</h3>
-              <p>{finding.description}</p>
-              <div className="finding-evidence">
-                <code>{finding.filePath}{finding.lineNumber ? `:${finding.lineNumber}` : ""}</code>
-                {finding.maskedSample && <code className="masked-sample">{finding.maskedSample}</code>}
-              </div>
-              <div className="remediation"><strong>Remediation</strong><p>{finding.remediation}</p></div>
+      <section className="findings-section" aria-labelledby="findings-heading">
+        <div className="section-heading"><h2 id="findings-heading">Findings</h2>{result && <span>{result.findings.length} open</span>}</div>
+        {!result && <div className="empty-state panel">Your results will appear here. Start with Scan Project above.</div>}
+        {result && result.findings.length === 0 && <div className="empty-state panel clean-state"><strong>No supported security issues found.</strong><p>Your latest scan is clear. Review the score note for what this covers.</p></div>}
+        {result?.findings.map((finding) => (
+          <details className="finding panel" key={`${result.scanId}:${finding.id}`}>
+            <summary className="finding-summary">
+              <span className={`severity severity-${finding.severity.toLowerCase()}`}>{finding.severity}</span>
+              <span className="finding-heading"><strong>{finding.title}</strong><code>{finding.filePath}{finding.lineNumber ? `:${finding.lineNumber}` : ""}</code></span>
+              <span className="finding-status">{finding.status}</span>
+              <span className="expand-label" aria-hidden="true">Details <span className="chevron">⌄</span></span>
+            </summary>
+            <div className="finding-body">
+              <h3>What happened?</h3><p>{finding.description}</p>
+              <h3>Why it matters</h3><p>{finding.category === "SECRET"
+                ? "If a credential is real, someone who can read the project may be able to access the account or service it belongs to."
+                : "Sensitive files can accidentally be included when you share your project or push it to Git."}</p>
+              <h3>How to fix it</h3><p>{finding.remediation}</p>
               <FindingExplanation scanId={result.scanId} findingId={finding.id} />
-            </article>
-          ))}
-          {result && <p className="scan-meta">Scanned at {result.scannedAt} · Scan {result.scanId}</p>}
-        </section>
-      </div>
+              <details className="technical-details"><summary>Technical details</summary>
+                <dl><dt>Category</dt><dd>{finding.category}</dd><dt>Finding ID</dt><dd>{finding.id}</dd><dt>Score penalty</dt><dd>{finding.penalty} points</dd>
+                  {finding.lineNumber && <><dt>Line number</dt><dd>{finding.lineNumber}</dd></>}
+                  {finding.maskedSample && <><dt>Masked sample</dt><dd><code>{finding.maskedSample}</code></dd></>}
+                  <dt>Scan ID</dt><dd>{result.scanId}</dd><dt>Scanned at</dt><dd>{result.scannedAt}</dd></dl>
+              </details>
+            </div>
+          </details>
+        ))}
+      </section>
 
-      <footer>Score starts at 100. Critical −25 · High −15 · Medium −8 · Low −3.
-        Emitted findings stay OPEN. Only a later deterministic scan can verify disappearance.</footer>
+      {target === "vulnerable-demo" && <>
+        <section className="demo-workflow panel" aria-labelledby="fix-heading">
+          <div><p className="eyebrow">Next step · Fix</p><h2 id="fix-heading">Ready to fix these issues?</h2>
+            <p>HackForge can safely repair the controlled demo project.</p><p className="helper">You’ll confirm the changes before they are applied.</p>
+            {activity === "Applying safe demo fixes..." && <p role="status">{activity}</p>}</div>
+          <button className="secondary-button" disabled={scanning || !result || fixed} onClick={() => void demoAction("apply-safe-fixes")}>Apply Safe Demo Fixes</button>
+        </section>
+        <section className="verify-workflow panel" aria-labelledby="verify-heading">
+          <div><p className="eyebrow">Next step · Verify</p><h2 id="verify-heading">Check that your fixes worked.</h2><p>A new scan verifies the result and compares your scores.</p>
+            {activity === "SAI is verifying the fixes..." && <p role="status">{activity}</p>}</div>
+          <button disabled={scanning || !result} onClick={() => void scan(undefined, true)}>Rescan &amp; Verify <span aria-hidden="true">→</span></button>
+        </section>
+        {notice && <p className="notice" role="status">{notice}</p>}
+      </>}
+
+      {comparison && (
+        <section className="comparison" aria-labelledby="comparison-heading" aria-live="polite">
+          <p className="eyebrow">Security improvement</p><h2 id="comparison-heading">Before vs After</h2>
+          <div className="comparison-grid">
+            <div className="comparison-card"><p className="comparison-label">Before</p><strong>{comparison.previousScore}<span> / 100</span></strong><p>{comparison.previousCount} {comparison.previousCount === 1 ? "finding" : "findings"}</p></div>
+            <span className="comparison-arrow" aria-hidden="true">→</span>
+            <div className="comparison-card after-card"><p className="comparison-label">After</p><strong>{comparison.newScore}<span> / 100</span></strong><p>{comparison.newCount} {comparison.newCount === 1 ? "finding" : "findings"}</p></div>
+            <div className="improvement"><strong>{comparison.improvement >= 0 ? "+" : ""}{comparison.improvement}</strong><p>Verified improvement</p></div>
+          </div>
+          <p className="verification-label">Fixes verified by SAI Security Scanner</p>
+          <div className="comparison-totals"><p>Resolved after rescan: <strong>{comparison.disappeared.length}</strong></p><p>Remaining: <strong>{comparison.remaining.length}</strong></p></div>
+          <details className="comparison-details"><summary>Verification details</summary>
+            <h3>Resolved after rescan</h3>{comparison.disappeared.length ? <ul>{comparison.disappeared.map((finding) => <li key={finding.id}>{finding.title} · <code>{finding.id}</code></li>)}</ul> : <p>No finding IDs disappeared.</p>}
+            <h3>Remaining findings</h3>{comparison.remaining.length ? <ul>{comparison.remaining.map((finding) => <li key={finding.id}>{finding.title} · {finding.status}</li>)}</ul> : <p>No findings remain in the current scan.</p>}
+            <p>Verification compares current project scans. Credential rotation and Git history review are still recommended; this does not certify Git history is clean.</p>
+          </details>
+        </section>
+      )}
+
+      {target === "vulnerable-demo" && <section className="reset-demo" aria-label="Repeat the demo">
+        <div><h2>Demo again?</h2><p>Restore the controlled vulnerable project so the demo can be repeated.</p></div>
+        <button className="tertiary-button" disabled={scanning} onClick={() => void demoAction("reset-vulnerable-demo")}>Reset Demo</button>
+      </section>}
+      <footer><strong>HackForge</strong><span>Build Fast. Ship Secure.</span><p>SAI Scanner finds it. SAI Assistant explains it.</p></footer>
     </main>
   );
 }

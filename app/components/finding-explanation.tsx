@@ -30,7 +30,7 @@ export function FindingExplanation({ scanId, findingId }: { scanId: string; find
 
   return (
     <div className="finding-explanation">
-      <button type="button" onClick={explain} disabled={loading || result !== null}
+      <button className="secondary-button" type="button" onClick={explain} disabled={loading || result !== null}
         aria-expanded={result !== null} aria-controls={`explanation-${findingId}`}>
         {loading ? "Explaining…" : "Explain with SAI"}
       </button>
@@ -48,9 +48,9 @@ export function FindingExplanation({ scanId, findingId }: { scanId: string; find
             <p>{result.guidance.impact}</p>
             <h4>Remediation steps</h4>
             <ol>{result.guidance.remediationSteps.map((step, index) => <li key={index}>{step}</li>)}</ol>
-            <h4>Priority explanation</h4>
+            <h4>Why this should be addressed</h4>
             <p>{result.guidance.priorityReason}</p>
-            <p className="explanation-note">Review guidance before making changes. SAI Security Scanner controls findings, severity, score, and status.</p>
+            <p className="explanation-note">SAI Assistant cannot create findings, change severity, change scores, or mark issues resolved.</p>
           </div>
         )}
       </div>
