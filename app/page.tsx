@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { SEVERITIES } from "../lib/scanner/types.ts";
 import type { ScanResult, ScanTarget } from "../lib/scanner/types.ts";
+import { FindingExplanation } from "./components/finding-explanation.tsx";
 
 const TARGET_LABELS: Record<ScanTarget, string> = {
   "vulnerable-demo": "Vulnerable Demo",
@@ -42,7 +43,7 @@ export default function Home() {
     <main className="workspace">
       <header className="workspace-header">
         <div>
-          <p className="eyebrow">hackUMBC 2026 · Phase 1</p>
+          <p className="eyebrow">hackUMBC 2026 · Phase 2</p>
           <h1>HackForge<span className="brand-dot">.</span></h1>
         </div>
         <span className="phase-badge">CyberBot / deterministic scanner</span>
@@ -51,7 +52,8 @@ export default function Home() {
       <section className="intro">
         <h2>Know what&apos;s in your project.</h2>
         <p>Scan a controlled demo for exposed credentials and Git hygiene issues.
-          Findings come from deterministic rules. Credential values are masked on the server.</p>
+          Findings come from deterministic rules. Credential values are masked on the server.
+          Ask Gemini to explain a verified finding and its remediation.</p>
       </section>
 
       <form className="scan-controls panel" onSubmit={scan}>
@@ -101,7 +103,7 @@ export default function Home() {
             <div className="empty-state panel clean-state">No findings detected by Phase 1 rules. Score: 100 / 100.</div>
           )}
           {result?.findings.map((finding) => (
-            <article className="finding panel" key={finding.id}>
+            <article className="finding panel" key={`${result.scanId}:${finding.id}`}>
               <div className="finding-header">
                 <span className={`severity severity-${finding.severity.toLowerCase()}`}>{finding.severity}</span>
                 <span className="finding-category">{finding.category === "SECRET" ? "Secret detection" : "Git hygiene"}</span>
@@ -114,6 +116,7 @@ export default function Home() {
                 {finding.maskedSample && <code className="masked-sample">{finding.maskedSample}</code>}
               </div>
               <div className="remediation"><strong>Remediation</strong><p>{finding.remediation}</p></div>
+              <FindingExplanation scanId={result.scanId} findingId={finding.id} />
             </article>
           ))}
           {result && <p className="scan-meta">Scanned at {result.scannedAt} · Scan {result.scanId}</p>}
