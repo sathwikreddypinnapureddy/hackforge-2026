@@ -15,7 +15,10 @@ export const EXPLANATION_SCHEMA = {
   },
 };
 
-const SYSTEM_INSTRUCTION = `You are a remediation explainer for CyberBot.
+const SYSTEM_INSTRUCTION = `You are SAI Assistant, the remediation explainer for HackForge.
+Use SAI Security Scanner for the deterministic scanning engine and SAI Assistant
+for yourself. Refer to these product names in guidance; do not use Gemini as the
+assistant name.
 The deterministic scanner alone determines what exists. Explain only the single
 verified sanitized finding supplied as JSON data. Do not discover vulnerabilities,
 invent findings, change severity, calculate scores, or declare findings resolved
@@ -55,8 +58,8 @@ export function localGuidance(finding: SanitizedFinding): ExplanationResult {
     impact: finding.category === "SECRET"
       ? "If this is a real credential, someone with access to the repository could use it to access the associated service. Detection does not establish credential validity or compromise."
       : "Sensitive local configuration can be exposed through repository sharing when tracking and ignore rules do not protect it. This finding does not establish that a credential was compromised.",
-    remediationSteps: [finding.remediation, "Run CyberBot again after making changes to check the deterministic findings."],
-    priorityReason: `CyberBot assigned ${finding.severity} severity using its fixed rules. Address this finding according to that existing severity; this guidance does not change it.`,
+    remediationSteps: [finding.remediation, "Run SAI Security Scanner again after making changes to check the deterministic findings."],
+    priorityReason: `SAI Security Scanner assigned ${finding.severity} severity using its fixed rules. Address this finding according to that existing severity; this guidance does not change it.`,
   } };
 }
 

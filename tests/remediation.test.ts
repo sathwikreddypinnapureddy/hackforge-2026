@@ -12,7 +12,7 @@ import { scanProject } from "../lib/scanner/index.ts";
 import type { ScanResult } from "../lib/scanner/types.ts";
 
 const GUIDANCE = {
-  explanation: "CyberBot detected a literal credential in a project file.",
+  explanation: "SAI Security Scanner detected a literal credential in a project file.",
   impact: "A real credential could allow unauthorized access if shared.",
   remediationSteps: ["Remove the literal and load it from an environment variable.", "Rotate it if it is a real exposed credential."],
   priorityReason: "The scanner assigned this finding critical severity because it matches a credential format.",

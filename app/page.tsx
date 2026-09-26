@@ -42,11 +42,11 @@ export default function Home() {
       const next = await response.json() as ScanResult;
       if ((verify || fixed) && (before ?? result)) {
         setComparison(compareScans((before ?? result)!, next));
-        setNotice("Rescan complete. CyberBot verified the comparison below from deterministic findings.");
+        setNotice("Rescan complete. SAI Security Scanner verified the comparison below from deterministic findings.");
       } else setBefore(null);
       setResult(next);
     } catch {
-      setError("Cannot reach CyberBot. Check that the development server is running and try again.");
+      setError("Cannot reach SAI Security Scanner. Check that the development server is running and try again.");
     } finally { setScanning(false); }
   }
 
@@ -75,7 +75,7 @@ export default function Home() {
       setFixed(!reset);
       if (reset) setResult(null);
     } catch {
-      setError("Cannot reach CyberBot. Rescan before trusting the fixture state.");
+      setError("Cannot reach SAI Security Scanner. Rescan before trusting the fixture state.");
     } finally { setScanning(false); }
   }
 
@@ -86,14 +86,15 @@ export default function Home() {
           <p className="eyebrow">hackUMBC 2026 · Phase 3</p>
           <h1>HackForge<span className="brand-dot">.</span></h1>
         </div>
-        <span className="phase-badge">CyberBot / deterministic scanner</span>
+        <span className="phase-badge" role="status">{scanning ? "SAI Working…" : "SAI Ready"}</span>
       </header>
 
       <section className="intro">
         <h2>Know what&apos;s in your project.</h2>
         <p>Scan a controlled demo for exposed credentials and Git hygiene issues.
-          Findings come from deterministic rules. Credential values are masked on the server.
-          Ask Gemini to explain a verified finding and its remediation.</p>
+          SAI Security Scanner uses deterministic rules. Credential values are masked on the server.
+          Ask SAI Assistant to explain a verified finding and its remediation.</p>
+        <p>SAI Scanner finds it. SAI Assistant explains it.</p>
       </section>
 
       <form className="scan-controls panel" onSubmit={(event) => { void scan(event); }}>
@@ -137,7 +138,7 @@ export default function Home() {
             <div><p className="eyebrow">AFTER</p><strong>Score: {comparison.newScore}</strong><p>{comparison.newCount} findings</p></div>
           </div>
           <p className="verified-improvement">Verified improvement: {comparison.improvement >= 0 ? "+" : ""}{comparison.improvement}</p>
-          <p>CyberBot compared deterministic scans. Disappeared IDs are verified resolved in the current fixture state.</p>
+          <p>SAI Security Scanner compared deterministic scans. Disappeared IDs are verified resolved in the current fixture state.</p>
           <h3>Disappeared finding IDs ({comparison.disappeared.length})</h3>
           {comparison.disappeared.length === 0 ? <p>None.</p> : <ul>{comparison.disappeared.map((finding) => <li key={finding.id}>{finding.title} · <code>{finding.id}</code></li>)}</ul>}
           <h3>Findings in the new scan ({comparison.remaining.length})</h3>
@@ -155,7 +156,7 @@ export default function Home() {
             <div className={`score ${result && result.score < 70 ? "score-warning" : ""}`}>
               {result ? result.score : "—"}<span>/ 100</span>
             </div>
-            <p>{result ? `${TARGET_LABELS[result.target]} · ${result.findings.length} findings` : "Run a scan to see verified findings."}</p>
+            <p>{result ? `${TARGET_LABELS[result.target]} · SAI found ${result.findings.length} verified security ${result.findings.length === 1 ? "issue" : "issues"}.` : "Run a scan to see verified findings."}</p>
           </div>
           <div className="severity-grid">
             {SEVERITIES.map((severity) => (

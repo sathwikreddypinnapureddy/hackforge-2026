@@ -1,11 +1,15 @@
-# HackForge · CyberBot Phase 3
+# HackForge · SAI Phase 3
 
 HackForge is a security-first development workspace for hackathon teams, built
 during hackUMBC 2026. **The deterministic scanner determines what exists.** This
 phase adds confirmed demo remediation, deterministic rescanning, and before/after
-verification while preserving Gemini explanations. Gemini never discovers
+verification while preserving SAI Assistant explanations powered by Gemini. Gemini never discovers
 findings or controls severity, scores, or status. There is no authentication,
 database, or other sponsor integration.
+
+**SAI Scanner finds it. SAI Assistant explains it.** SAI Security Scanner is the
+deterministic scanning engine. SAI Assistant provides AI guidance based on a
+security issue already verified by HackForge. Gemini remains the underlying AI API.
 
 ## Run the demo
 
@@ -26,7 +30,7 @@ Select **Clean Demo** and scan again. Expect **100** and **0 findings**. This de
 uses environment references and a secret-free `.env.example`, with working
 ignore rules for root and nested environment files.
 
-Click **Explain with Gemini** on any finding for an explanation, potential
+Click **Explain with SAI** on any finding for an explanation, potential
 impact, remediation steps, and a reason for its existing priority. The server
 uses the existing `GEMINI_API_KEY` environment variable (or an ignored root
 `.env.local`). Never prefix this key with `NEXT_PUBLIC_`. No key is required to
@@ -230,7 +234,7 @@ modules in the Node test runner. Existing scanner and Gemini tests remain in pla
 
 1. Select **Vulnerable Demo**. Click **Reset Vulnerable Demo** and confirm to
    establish the known initial state, then **SCAN PROJECT**: 37 / 100, 4 findings.
-2. Click **Explain with Gemini** on a finding. Guidance must leave the score and
+2. Click **Explain with SAI** on a finding. Guidance must leave the score and
    findings unchanged; missing Gemini configuration uses the existing fallback.
 3. Click **Apply Safe Demo Fixes** and confirm. The previous scan still shows
    37 and 4 findings; the UI says verification is pending.
@@ -272,8 +276,9 @@ check no console logging, and exercise mocked Gemini before and after scans.
 
 1. Run `npm run dev` with the existing server-side `GEMINI_API_KEY`. Scan
    Vulnerable Demo: confirm 4 OPEN findings and score 37.
-2. Click **Explain with Gemini** on each finding. Check all four guidance fields
-   and the label “AI-generated explanation based on a verified CyberBot finding.”
+2. Click **Explain with SAI** on each finding. Check all four guidance fields
+   and the label “SAI Assistant” with the description
+   “AI guidance based on a security issue already verified by HackForge.”
    The browser request must contain only scan/finding IDs and target `/api/explain`.
    Verify the browser does not call Google directly and scores/statuses stay fixed.
 3. Restart with `GEMINI_API_KEY` unset or empty (also disable any `.env.local`

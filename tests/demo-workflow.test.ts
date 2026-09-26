@@ -69,7 +69,7 @@ test("confirmed cycles change only the controlled fixture and verify actual scan
   const oldKey = process.env.GEMINI_API_KEY;
   process.env.GEMINI_API_KEY = "fake-gemini-test-key";
   const transport = mock.method(geminiTransport, "generate", async () => JSON.stringify({
-    explanation: "CyberBot emitted this finding.", impact: "Review exposed configuration.",
+    explanation: "SAI Security Scanner emitted this finding.", impact: "Review exposed configuration.",
     remediationSteps: ["Use environment references and rescan."], priorityReason: "Use the scanner severity.",
   }));
   try {
