@@ -3,13 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "setup:demos": "node scripts/setup-demos.mjs",
+    "predev": "npm run setup:demos",
+    "dev": "next dev --webpack",
+    "prebuild": "npm run setup:demos",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pretest": "npm run setup:demos",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --test-isolation=none tests/*.test.ts"
+  },
+  "engines": {
+    "node": ">=22.18.0"
   },
   "dependencies": {
-    "@google/genai": "^2.24.0",
     "next": "16.3.6",
     "react": "19.2.8",
     "react-dom": "19.2.8"
