@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { scanTrustedTarget } from "../scanner/core.ts";
 import { AnalysisError, LIMITS, SAFE_GIT, SCANNER_VERSION, processEnvironment } from "./policy.ts";
 import { runCommand } from "./process.ts";
 import { parseTree } from "./tree.ts";
+import { isContained } from "../scanner/targets.ts";
 
 export async function scanAcquiredRepository(acquiredRoot: string, work: string) {
   const gitDir = path.join(acquiredRoot, ".git");
@@ -13,7 +14,7 @@ export async function scanAcquiredRepository(acquiredRoot: string, work: string)
   await mkdir(root, { recursive: true });
   const args = [...SAFE_GIT, "-c", `safe.directory=${acquiredRoot}`, `--git-dir=${gitDir}`, `--work-tree=${root}`];
   const git = (extra: string[], maxBytes = LIMITS.outputBytes) => runCommand("git", [...args, ...extra], {
-    cwd: work, maxBytes, env: { ...processEnvironment(), GIT_INDEX_FILE: indexPath }, failureCode: "UNSUPPORTED_REPOSITORY",
+    cwd: work, maxBytes, detached: false, env: { ...processEnvironment(), GIT_INDEX_FILE: indexPath }, failureCode: "UNSUPPORTED_REPOSITORY",
   });
   const commitSha = (await git(["rev-parse", "--verify", "HEAD^{commit}"])).toString("ascii").trim();
   if (!/^[0-9a-f]{40}$/.test(commitSha)) throw new AnalysisError("UNSUPPORTED_REPOSITORY");
@@ -33,8 +34,10 @@ export async function scanAcquiredRepository(acquiredRoot: string, work: string)
     } catch { binaryFilesSkipped++; continue; }
     sourceBytes += content.length;
     if (sourceBytes > LIMITS.sourceBytes) throw new AnalysisError("REPOSITORY_LIMIT");
-    const filename = path.join(root, entry.filePath);
+    const filename = path.resolve(root, entry.filePath);
+    if (!isContained(root, filename)) throw new AnalysisError("UNSUPPORTED_REPOSITORY");
     await mkdir(path.dirname(filename), { recursive: true });
+    if (!isContained(root, await realpath(path.dirname(filename)))) throw new AnalysisError("UNSUPPORTED_REPOSITORY");
     await writeFile(filename, content, { flag: "wx", mode: 0o600 });
   }
   // Build the index for the existing Git hygiene checks without checkout.

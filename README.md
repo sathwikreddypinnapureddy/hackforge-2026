@@ -3,7 +3,7 @@
 HackForge is a security-first development workspace for hackathon teams, built
 during hackUMBC 2026. **The deterministic scanner determines what exists.**
 The controlled demo remains available. Phase 5 adds local projects, read-only
-public GitHub intake, a disposable offline Docker scanner, baseline/rescan
+public GitHub intake, disposable local static analysis (or an optional offline Docker scanner), baseline/rescan
 history, and printable HTML / downloadable JSON reports. Gemini never discovers
 findings or controls severity, scores, or status. There is no authentication or
 database; the real repository workflow is intended for a single local user.
@@ -18,7 +18,6 @@ Requires Node.js 22.18+ and Git on PATH. Run from this project directory.
 
 ```bash
 npm ci
-npm run sandbox:build
 npm run dev
 ```
 
@@ -105,23 +104,33 @@ does not undo remediation. Setup is not called by the API or scanner.
 
 ## Real repository workflow (Phase 5)
 
-Requires Docker Desktop/Engine running with memory, CPU and PID limits supported,
-Node.js 24+ and Git. Build the trusted scanner image after source changes:
+Requires Node.js 22.18+ and Git. Docker is optional. Start from this project directory:
 
 ```bash
-npm ci
-npm run sandbox:build
 npm run dev
 ```
+
+`LocalStaticSandbox` is the default. To prefer Docker, build the trusted image
+with `npm run sandbox:build` and set `HACKFORGE_SANDBOX=DOCKER` when starting.
+If Docker or the configured image is unavailable, analysis automatically uses
+`LocalStaticSandbox`. Each scan records `LOCAL_STATIC` or `DOCKER`.
 
 Open **Projects**, enter `https://github.com/owner/repo`, and click **Analyze
 Repository**. Only public GitHub HTTPS URLs are accepted, with an optional
 `.git` suffix. A fresh shallow, no-checkout acquisition obtains the latest
 default-branch commit using a fixed HTTPS Git read proxy with a 100 MiB byte
 budget, no redirects or credentials, a 45-second timeout, no repository
-templates or submodules, and no script execution. It first checks Docker and
-the image; Docker unavailability stops the scan safely. Git's object pack is
+templates or submodules, and no script execution. Git's object pack is
 stored under a disposable system temp directory, never in the HackForge source.
+
+The local worker is a fixed HackForge Node subprocess with a minimal environment,
+a 512 MiB Node heap limit, bounded output, and a 60-second deadline. It runs the
+same deterministic SAI worker, materializing validated Git blobs as data without
+checkout, package installation, hooks, filters, scripts, or application execution.
+It rejects symlinks and unsafe paths before reading source. It is a temporary
+local workspace, not a VM or container. Reports state its static-only methodology.
+The service removes the entire workspace in `finally` on success, failure, timeout,
+or request abort, and persists results only after cleanup succeeds.
 
 The Docker worker has a read-only mount of the acquired Git objects, no network,
 no privileges/capabilities, a nonroot user, a read-only root filesystem, a
@@ -395,7 +404,7 @@ are intentionally absent.
 
 1. Reset Vulnerable Demo and scan: 37 / 100, four verified findings. Apply Safe
    Demo Fixes, then Rescan & Verify: 100 / 100. Repeatable offline, no Docker.
-2. With Docker running and `npm run sandbox:build` complete, paste your own
+2. Using the default local static fallback, paste your own
    public GitHub test repository containing **only fake, nonfunctional** demo
    credentials. The UI labels the controlled demo credentials nonfunctional;
    the public test repository must also explicitly say so in its README.
@@ -406,10 +415,8 @@ are intentionally absent.
 5. Click Refresh Repository & Rescan or Run Final Scan. Show the second actual
    commit SHA, timeline, verified disappeared/remaining/new IDs, score delta,
    and printable HTML / JSON report. Verify `hackforge-analysis-*` temporary
-   directories were removed and no Docker container remains.
+   and `hackforge-local-static-*` directories were removed (and no container remains when using Docker).
 
-The runner used for this implementation lacked Docker, so the container build
-and a live GitHub-to-Docker demonstration require validation on the local
-Docker-equipped machine. The synthetic two-commit tests exercise scanner,
-redaction, SHA evidence, persistence, comparison, cleanup and reports; they
-do not substitute for running Docker and GitHub on the judge machine.
+Docker-specific runtime validation requires a Docker-equipped machine. Local
+static validation does not require Docker. Never install or run target repository
+code; only HackForge-controlled Git read commands and the SAI scanner are used.

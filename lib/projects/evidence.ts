@@ -25,6 +25,9 @@ export function sanitizeRepositoryEvidence(input: unknown): RepositoryScan {
     || value.scannerVersion !== SCANNER_VERSION || !["BASELINE", "RESCAN", "FINAL"].includes(value.scanType)
     || !Number.isFinite(Date.parse(value.scannedAt)) || !Array.isArray(value.findings) || value.findings.length > LIMITS.findings) throw new AnalysisError("ANALYSIS_FAILED");
   validateProjectId(value.projectId);
+  // Older Phase 5 scans were exclusively Docker scans.
+  const sandboxMode = value.sandboxMode ?? "DOCKER";
+  if (sandboxMode !== "DOCKER" && sandboxMode !== "LOCAL_STATIC") throw new AnalysisError("ANALYSIS_FAILED");
   const seen = new Set<string>();
   const findings = value.findings.map((f): Finding => {
     if (!/^[a-f0-9]{24}$/.test(f.id) || seen.has(f.id) || !/^\[path:[a-f0-9]{16}\]$/.test(f.filePath)
@@ -49,7 +52,7 @@ export function sanitizeRepositoryEvidence(input: unknown): RepositoryScan {
   const score = calculateScore(findings);
   if (score !== value.score || SEVERITIES.some((s) => counts[s] !== value.counts?.[s])) throw new AnalysisError("ANALYSIS_FAILED");
   return { scanId: value.scanId, target: "repository", projectId: value.projectId, commitSha: value.commitSha,
-    scanType: value.scanType, scannerVersion: SCANNER_VERSION, scannedAt: new Date(value.scannedAt).toISOString(), score, findings, counts,
+    sandboxMode, scanType: value.scanType, scannerVersion: SCANNER_VERSION, scannedAt: new Date(value.scannedAt).toISOString(), score, findings, counts,
     coverage: { filesScanned: integer(value.coverage?.filesScanned, LIMITS.files),
       binaryFilesSkipped: integer(value.coverage?.binaryFilesSkipped, LIMITS.files),
       generatedFilesSkipped: integer(value.coverage?.generatedFilesSkipped, LIMITS.files) } };

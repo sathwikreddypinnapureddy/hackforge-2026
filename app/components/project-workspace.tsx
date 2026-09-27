@@ -73,7 +73,7 @@ export function ProjectWorkspace() {
         value={url} disabled={busy} onChange={(event) => setUrl(event.target.value)} />
         <button disabled={busy} type="submit">Analyze Repository →</button></div>
     </form>
-    <p className="helper">Public GitHub repositories only. Keep your source and credentials out of the URL. Docker and the HackForge scanner image are required.</p>
+    <p className="helper">Public GitHub repositories only. Keep your source and credentials out of the URL. Analysis uses a temporary workspace and static checks only.</p>
     {projects.length > 0 && <div className="project-list"><h3>Projects</h3><div>{projects.map((project) => (
       <button type="button" className={detail?.project.id === project.id ? "project-item active" : "project-item"}
         onClick={() => void showProject(project.id)} disabled={busy} key={project.id}>

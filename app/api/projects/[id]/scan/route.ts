@@ -18,7 +18,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     if (proposed) type = proposed;
   } catch { return Response.json({ error: "Provide only an optional RESCAN or FINAL scan type." }, { status: 400, headers: JSON_HEADERS }); }
   try {
-    const detail = await analyzeProject(validateProjectId((await context.params).id), type);
+    const detail = await analyzeProject(validateProjectId((await context.params).id), type, undefined, undefined, request.signal);
     const latest = detail.scans.at(-1)!;
     const session = scanStore.register(latest, scanSession(request));
     return Response.json(detail, { headers: { ...JSON_HEADERS, "Set-Cookie": sessionCookie(session, request) } });

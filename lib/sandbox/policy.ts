@@ -21,7 +21,7 @@ export const ERROR_MESSAGES = {
   SCAN_TIMEOUT: "Repository analysis timed out. No result was recorded.",
   UNSUPPORTED_REPOSITORY: "Repository contains unsupported files, links, submodules, or malformed data. No score was recorded.",
   ANALYSIS_FAILED: "Repository analysis could not be completed.",
-  CLEANUP_FAILED: "Analysis workspace cleanup could not be confirmed. Restart Docker and remove containers labeled hackforge.sandbox=true before retrying.",
+  CLEANUP_FAILED: "Analysis workspace cleanup could not be confirmed. Check temporary analysis workspaces (and containers labeled hackforge.sandbox=true when using Docker) before restarting HackForge.",
   BUSY: "Another repository analysis is running. Try again when it finishes.",
   STORE_LIMIT: "Local project storage is full. No new scan was saved.",
 } as const;

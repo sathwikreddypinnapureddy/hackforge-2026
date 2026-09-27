@@ -66,7 +66,7 @@ export class DockerAnalysisSandbox implements AnalysisSandbox {
     try { result = JSON.parse(output.toString("utf8")); }
     catch { throw new AnalysisError("ANALYSIS_FAILED"); }
     if (result?.error) throw new AnalysisError(Object.hasOwn(ERROR_MESSAGES, result.error) ? result.error as AnalysisErrorCode : "ANALYSIS_FAILED");
-    return result as Omit<RepositoryScan, "projectId" | "scanType">;
+    return { ...result, sandboxMode: "DOCKER" } as Omit<RepositoryScan, "projectId" | "scanType">;
   }
   async destroy() {
     let cleanupFailed = false;
@@ -86,7 +86,3 @@ export class DockerAnalysisSandbox implements AnalysisSandbox {
     if (cleanupFailed) throw new AnalysisError("CLEANUP_FAILED");
   }
 }
-
-// Only this factory is used by the server. There is deliberately no host-scan
-// fallback when Docker is missing. Tests inject a fixture sandbox explicitly.
-export const sandboxFactory = { create: (): AnalysisSandbox => new DockerAnalysisSandbox() };

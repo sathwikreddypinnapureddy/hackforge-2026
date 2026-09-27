@@ -15,6 +15,7 @@ export interface RepositoryScan extends ScanResult {
   target: "repository";
   projectId: string;
   commitSha: string;
+  sandboxMode: "DOCKER" | "LOCAL_STATIC";
   scanType: "BASELINE" | "RESCAN" | "FINAL";
   scannerVersion: string;
   coverage: { filesScanned: number; binaryFilesSkipped: number; generatedFilesSkipped: number };

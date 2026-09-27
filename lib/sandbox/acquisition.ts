@@ -7,7 +7,7 @@ import { validateRepositoryUrl } from "../projects/url.ts";
 import { AnalysisError, LIMITS, SAFE_GIT } from "./policy.ts";
 import { runCommand } from "./process.ts";
 
-export interface RepositoryAcquisition { clone(repositoryUrl: string, workspace: string): Promise<string> }
+export interface RepositoryAcquisition { clone(repositoryUrl: string, workspace: string, signal?: AbortSignal): Promise<string> }
 
 export class TransferBudget {
   private received = 0;
@@ -107,17 +107,17 @@ export async function validateAcquiredTree(root: string) {
 }
 
 export class PublicGitHubAcquisition implements RepositoryAcquisition {
-  async clone(repositoryUrl: string, workspace: string): Promise<string> {
+  async clone(repositoryUrl: string, workspace: string, signal?: AbortSignal): Promise<string> {
     validateRepositoryUrl(repositoryUrl);
     const proxy = await githubReadProxy(repositoryUrl);
     const root = path.join(workspace, "repository");
-    await mkdir(path.join(workspace, "empty-template"));
     try {
+      await mkdir(path.join(workspace, "empty-template"));
       // No checkout, hooks, templates, credentials, submodules, LFS, or helpers.
-      // The host only receives Git objects; source materialization is in Docker.
+      // Source materialization uses validated blobs in the controlled scanner worker.
       await runCommand("git", [...SAFE_GIT, "clone", "--quiet", "--depth=1", "--single-branch", "--no-tags",
         "--no-checkout", "--no-recurse-submodules", `--template=${path.join(workspace, "empty-template")}`,
-        "--", proxy.url, root], { cwd: workspace, timeoutMs: LIMITS.cloneMs, timeoutCode: "CLONE_TIMEOUT", failureCode: "REPOSITORY_UNAVAILABLE" });
+        "--", proxy.url, root], { cwd: workspace, timeoutMs: LIMITS.cloneMs, timeoutCode: "CLONE_TIMEOUT", failureCode: "REPOSITORY_UNAVAILABLE", signal });
       if (proxy.failure()) throw proxy.failure();
       await validateAcquiredTree(root);
       return root;

@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { validateRepositoryUrl } from "../lib/projects/url.ts";
 import { TransferBudget } from "../lib/sandbox/acquisition.ts";
 import { parseTree } from "../lib/sandbox/tree.ts";
+import { LocalStaticSandbox } from "../lib/sandbox/local.ts";
+import { AutomaticSandbox, sandboxFactory } from "../lib/sandbox/selection.ts";
+import { AnalysisError } from "../lib/sandbox/policy.ts";
+import { runCommand } from "../lib/sandbox/process.ts";
 import { dockerScanArguments } from "../lib/sandbox/docker.ts";
 import { processEnvironment, SCANNER_VERSION } from "../lib/sandbox/policy.ts";
 import { scanAcquiredRepository } from "../lib/sandbox/worker.ts";
@@ -165,4 +169,117 @@ test("unsupported symlinks fail closed; analysis failure destroys sandbox and sa
     assert.equal((await storage.get(created.project.id)).scans.length, 0);
     assert.equal((await storage.get(created.project.id)).project.status, "NOT_SCANNED");
   } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+
+test("local static lifecycle: unique OS temp roots, real SHA, deterministic evidence, sanitized storage/report and cleanup", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "hackforge-local-test-"));
+  try {
+    const { repo, git } = await trustedFixture(root);
+    // More executable-looking data: these must never be run.
+    await writeFile(path.join(repo, "attack.py"), 'raise RuntimeError("NEVER EXECUTE")');
+    await writeFile(path.join(repo, "attack.sh"), 'touch /tmp/NEVER_RUN_HACKFORGE_TEST');
+    await writeFile(path.join(repo, "attack.ps1"), 'throw "NEVER EXECUTE"');
+    await writeFile(path.join(repo, "README.md"), 'Run bash attack.sh');
+    git("add", "."); git("-c", "user.email=test@example.invalid", "-c", "user.name=Fixture", "commit", "-qm", "scripts");
+    const acquisition = { async clone(url: string, workspace: string) {
+      assert.match(url, /^https:\/\/github.com\//);
+      const destination = path.join(workspace, "repository");
+      await cp(repo, destination, { recursive: true }); return destination;
+    } };
+    const store = new LocalProjectRepository(path.join(root, "store"));
+    const project = await store.create("https://github.com/fixture/local");
+    const workspaces: string[] = [];
+    const factory = () => {
+      const sandbox = new LocalStaticSandbox(acquisition);
+      const create = sandbox.create.bind(sandbox);
+      sandbox.create = async () => { await create(); workspaces.push(sandbox.getWorkspacePath()); };
+      return sandbox;
+    };
+    const first = await analyzeProject(project.project.id, "RESCAN", store, factory);
+    const second = await analyzeProject(project.project.id, "RESCAN", store, factory);
+    assert.notEqual(workspaces[0], workspaces[1]);
+    for (const workspace of workspaces) {
+      assert.equal(path.dirname(workspace), await import("node:fs/promises").then((fs) => fs.realpath(os.tmpdir())));
+      await assert.rejects(() => stat(workspace));
+    }
+    assert.equal(first.scans[0].commitSha, git("rev-parse", "HEAD"));
+    assert.equal(first.scans[0].sandboxMode, "LOCAL_STATIC");
+    assert.deepEqual(first.scans[0].findings, second.scans[1].findings);
+    assert.equal(compareRepositoryScans(second.scans[0], second.scans[1]).improvement, 0);
+    const report = createSecurityReport(second);
+    assert.ok(report.methodology.includes("Repository analysis was performed in a temporary local workspace using static analysis only. Repository application code and package scripts were not executed."));
+    for (const output of [JSON.stringify(report), renderSecurityReport(second), await readFile(path.join(root, "store/projects.json"), "utf8")]) {
+      assert.ok(!output.includes(credential)); assert.ok(!output.includes("fake-hardcoded-demo"));
+    }
+    await assert.rejects(() => stat("/tmp/NEVER_RUN_HACKFORGE_TEST"));
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("local cleanup covers clone failure, scan failure, real worker timeout, abort and symlink escape", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "hackforge-local-test-"));
+  try {
+    const { repo } = await trustedFixture(root);
+    const store = new LocalProjectRepository(path.join(root, "store"));
+    const project = await store.create("https://github.com/fixture/failure");
+    for (const scenario of ["clone", "scan", "timeout", "abort", "symlink", "path"]) {
+      const controller = new AbortController();
+      let workspace = "";
+      const acquisition = { async clone(_url: string, destination: string) {
+        workspace = destination;
+        if (scenario === "clone") throw new Error("clone failed");
+        if (scenario === "path") return "/etc";
+        const repository = path.join(destination, "repository");
+        await cp(repo, repository, { recursive: true });
+        if (scenario === "symlink") await symlink("/etc/passwd", path.join(repository, "escape"));
+        if (scenario === "scan") await writeFile(path.join(repository, ".git/HEAD"), "invalid");
+        if (scenario === "abort") controller.abort();
+        return repository;
+      } };
+      await assert.rejects(() => analyzeProject(project.project.id, "RESCAN", store,
+        () => new LocalStaticSandbox(acquisition, controller.signal, scenario === "timeout" ? 1 : undefined), controller.signal),
+        (error: unknown) => scenario !== "timeout" || (error instanceof AnalysisError && error.code === "SCAN_TIMEOUT"));
+      await assert.rejects(() => stat(workspace));
+      assert.equal((await store.get(project.project.id)).scans.length, 0);
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test("local rejects user filesystem paths before acquisition and subprocesses receive no host secrets", async () => {
+  let called = false;
+  const sandbox = new LocalStaticSandbox({ async clone() { called = true; return "/etc"; } });
+  await sandbox.create();
+  try {
+    for (const input of ["/etc", "/home", "/mnt", "../", process.cwd(), "file:///etc/passwd"]) {
+      await assert.rejects(() => sandbox.cloneRepository(input));
+    }
+    assert.equal(called, false);
+    const keys = ["GEMINI_API_KEY", "OPENAI_API_KEY", "TIGER_API_KEY", "UNRELATED_SECRET", "NODE_OPTIONS"];
+    const prior = keys.map((key) => process.env[key]);
+    try {
+      keys.forEach((key) => { process.env[key] = "private-test-value"; });
+      const output = await runCommand("node", ["-e", "process.stdout.write(JSON.stringify(process.env))"], { cwd: sandbox.getWorkspacePath() });
+      const environment = JSON.parse(output.toString());
+      keys.forEach((key) => assert.equal(environment[key], undefined));
+      assert.ok(!output.toString().includes("private-test-value"));
+    } finally { keys.forEach((key, i) => { if (prior[i] === undefined) delete process.env[key]; else process.env[key] = prior[i]; }); }
+  } finally { await sandbox.destroy(); }
+});
+
+test("selection uses local without Docker configuration and falls back on Docker unavailable without running Docker", async () => {
+  const fallback = new AutomaticSandbox(true, undefined, () => ({
+    async create() { throw new AnalysisError("DOCKER_UNAVAILABLE"); },
+    async destroy() {}, async cloneRepository() { throw new Error(); },
+    getWorkspacePath() { throw new Error(); }, async scan() { throw new Error(); },
+  }));
+  await fallback.create();
+  const workspace = fallback.getWorkspacePath();
+  assert.match(workspace, /hackforge-local-static-/);
+  await fallback.destroy(); await assert.rejects(() => stat(workspace));
+  const prior = process.env.HACKFORGE_SANDBOX;
+  delete process.env.HACKFORGE_SANDBOX;
+  try {
+    const unconfigured = sandboxFactory.create();
+    await unconfigured.create(); assert.match(unconfigured.getWorkspacePath(), /hackforge-local-static-/); await unconfigured.destroy();
+  } finally { if (prior !== undefined) process.env.HACKFORGE_SANDBOX = prior; }
 });
