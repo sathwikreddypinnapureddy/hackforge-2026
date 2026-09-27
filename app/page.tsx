@@ -92,7 +92,7 @@ export default function Home() {
       <a className="skip-link" href={mode === "projects" ? "#projects" : "#scan-project"}>Skip to workspace</a>
       <header className="workspace-header">
         <div className="brand"><span className="brand-mark" aria-hidden="true"><HackForgeLogo size={36} decorative /></span><div>
-          <p className="brand-name">HackForge<span className="brand-dot">.</span></p>
+          <p className="brand-name">Hack<span className="brand-dot">Forge.</span></p>
           <p className="tagline">Build Fast. Ship Secure.</p>
         </div></div>
         <nav className="app-navigation" aria-label="Application mode">
