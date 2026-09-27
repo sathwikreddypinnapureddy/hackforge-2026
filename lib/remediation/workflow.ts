@@ -26,6 +26,7 @@ function pathReference(value: string) { return `[path:${createHash("sha256").upd
 interface Pending { session: RemediationSession; workspace: string; repository: string; source: string; index: string;
   operations: PatchOperation[]; fileDigests: Map<string, string | null>; baseline: RepositoryScan; owner: string; expires: number; busy: boolean }
 export class RemediationWorkflow {
+  private proposals = new Map<string, Promise<RemediationSession>>();
   private pending = new Map<string, Pending>();
   private projects: ProjectRepository;
   private acquisition: RepositoryAcquisition;
@@ -52,7 +53,22 @@ export class RemediationWorkflow {
       await rm(p.workspace, { recursive: true, force: true }); this.pending.delete(id);
     }
   }
-  async propose(projectId: string, scanId: string, findingId: string, owner: string) {
+  async propose(projectId: string, scanId: string, findingId: string, owner: string): Promise<RemediationSession> {
+    const key = JSON.stringify([projectId, scanId, findingId]);
+    const running = this.proposals.get(key);
+    if (running) { await running; return this.propose(projectId, scanId, findingId, owner); }
+    const task = this.prepareProposal(projectId, scanId, findingId, owner);
+    this.proposals.set(key, task);
+    try { return await task; } finally { this.proposals.delete(key); }
+  }
+  private async prepareProposal(projectId: string, scanId: string, findingId: string, owner: string) {
+    const ready = (await this.journal.list(projectId)).reverse().find((s) => s.scanId === scanId && s.findingIds.includes(findingId) && s.status === "READY_FOR_REVIEW");
+    if (ready) return structuredClone(ready);
+    const existing = [...this.pending.values()].find((p) => p.session.projectId === projectId && p.session.scanId === scanId && p.session.findingIds.includes(findingId) && p.expires > Date.now());
+    if (existing) {
+      if (existing.owner !== owner) throw new Error("Proposal unavailable; another review is in progress");
+      return structuredClone(existing.session);
+    }
     await this.expire();
     if (this.pending.size >= 10) throw new Error("Too many proposals");
     const detail = await this.projects.get(projectId);
@@ -169,6 +185,7 @@ export class RemediationWorkflow {
       s.commit = { branchName: s.branchName, commitSha: metadata[0], commitSubject: metadata[1], findingIds: s.findingIds,
         filesChanged: changed.map(pathReference), authorTimestamp: new Date(metadata[2]).toISOString(), committerTimestamp: new Date(metadata[3]).toISOString(), sanitizedSummary: s.proposal!.remediation };
       await this.event(p, "COMMIT_CREATED", "Focused remediation commit created; Git author and committer times captured.");
+      s.status = "RESCANNING";
       await this.event(p, "RESCAN_STARTED", "Deterministic scanner started against the remediation commit.");
       await mkdir(path.join(p.workspace, "rescan"));
       const after = sanitizeRepositoryEvidence({ ...await scanAcquiredRepository(p.repository, path.join(p.workspace, "rescan")), projectId: s.projectId, scanType: "RESCAN", sandboxMode: "LOCAL_STATIC" });

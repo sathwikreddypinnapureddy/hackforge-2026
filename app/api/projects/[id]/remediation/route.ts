@@ -3,11 +3,12 @@ import { validateProjectId } from "../../../../../lib/projects/url.ts";
 import { readBoundedJson } from "../../../../../lib/http.ts";
 import { scanSession, scanStore, validateExplainInput } from "../../../../../lib/remediation/scan-store.ts";
 import { remediationWorkflow } from "../../../../../lib/remediation/workflow.ts";
+import { remediationView } from "../../../../../lib/remediation/view.ts";
 export const runtime = "nodejs";
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   if (!sameOrigin(request)) return Response.json({ error: "Use same-origin requests." }, { status: 403, headers: JSON_HEADERS });
   try {
-    return Response.json(await remediationWorkflow.journal.list(validateProjectId((await context.params).id)), { headers: JSON_HEADERS });
+    return Response.json((await remediationWorkflow.journal.list(validateProjectId((await context.params).id))).map(remediationView), { headers: JSON_HEADERS });
   } catch { return Response.json({ error: "Timeline unavailable." }, { status: 503, headers: JSON_HEADERS }); }
 }
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -32,7 +33,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       result = input.action === "cancel" ? await remediationWorkflow.cancel(input.sessionId, owner)
         : await remediationWorkflow.approve(input.sessionId, owner, input.approved === true);
     } else throw new Error("Invalid remediation request");
-    return Response.json(result, { headers: JSON_HEADERS });
+    return Response.json(remediationView(result), { headers: JSON_HEADERS });
   } catch (cause) {
     // Workflow errors are fixed HackForge copy, never Git stderr or repository text.
     const allowed = /^(Refresh the repository scan|This finding requires manual|Repository changed;|Explicit approval required|Proposal unavailable|Safe remediation proposal|Remediation failed safely|Invalid remediation request|Too many proposals)/;

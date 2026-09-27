@@ -15,7 +15,7 @@ import { compareRepositoryScans } from "../lib/projects/report.ts";
 import type { PatchOperation } from "../lib/remediation/workflow-types.ts";
 
 const fake = "sk-" + "proj-NONFUNCTIONALPHASE6FAKE123456";
-async function fixture() {
+async function fixture(clean = false) {
   const root = await mkdtemp(path.join(os.tmpdir(), "hackforge-phase6-test-"));
   const repo = path.join(root, "fixture"); const empty = path.join(root, "empty");
   await mkdir(repo); await mkdir(empty);
@@ -28,6 +28,10 @@ async function fixture() {
   await writeFile(path.join(repo, "package.json"), JSON.stringify({ scripts: { preinstall: `touch ${marker}`, postinstall: `touch ${marker}`, prepare: `touch ${marker}` } }));
   for (const filename of ["attack.sh", "Makefile", "Dockerfile", "attack.py", "attack.ps1"]) await writeFile(path.join(repo, filename), `touch ${marker}\n`);
   await writeFile(path.join(repo, ".gitattributes"), "* filter=attack\n");
+  if (clean) {
+    for (const file of [".env", "config.js", "package.json", "attack.sh", "Makefile", "Dockerfile", "attack.py", "attack.ps1", ".gitattributes"]) await rm(path.join(repo, file));
+    await writeFile(path.join(repo, "README.md"), "Controlled missing ignore fixture\n");
+  }
   git("add", "."); git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "controlled fake baseline");
   await mkdir(path.join(repo, ".git/hooks"));
   await writeFile(path.join(repo, ".git/hooks/pre-commit"), `#!/bin/sh\ntouch ${marker}\n`, { mode: 0o755 });
@@ -240,4 +244,48 @@ test("file drift after proposal fails closed without a commit, rescan, or ready 
     await assert.rejects(() => readdir(f.workspace()));
     assert.equal(f.git("rev-parse", "main"), f.scan.commitSha);
   } finally { await rm(f.root, { recursive: true, force: true }); }
+});
+
+
+test("Phase 7: 92 source remains open, 100 branch verifies resolution, concurrent and persisted proposals reuse one session", async () => {
+  const f = await fixture(true); let workspace = "";
+  try {
+    assert.equal(f.scan.score, 92); assert.equal(f.scan.findings.length, 1);
+    const finding = f.scan.findings[0]; assert.equal(finding.title, "Missing .gitignore");
+    const [proposal, duplicate] = await Promise.all([f.workflow.propose(f.scan.projectId, f.scan.scanId, finding.id, "owner"), f.workflow.propose(f.scan.projectId, f.scan.scanId, finding.id, "owner")]);
+    workspace = f.workspace(); assert.equal(proposal.id, duplicate.id);
+    const ready = await f.workflow.approve(proposal.id, "owner", true);
+    assert.equal(ready.beforeScore, 92); assert.equal(ready.afterScore, 100);
+    assert.deepEqual(ready.resolved!.map((x) => x.id), [finding.id]);
+    assert.equal(ready.remaining!.length, 0); assert.equal(ready.newFindings!.length, 0);
+    const source = (await f.store.get(f.scan.projectId)).scans.at(-1)!;
+    assert.equal(source.score, 92); assert.deepEqual(source.findings, f.scan.findings);
+    assert.equal(f.git("rev-parse", "main"), source.commitSha);
+    const repeated = await f.workflow.propose(f.scan.projectId, f.scan.scanId, finding.id, "owner");
+    assert.equal(repeated.id, ready.id);
+    const restarted = new RemediationWorkflow(f.store, { async clone() { throw new Error("Must not clone again"); } }, new RemediationJournal(path.join(f.root, "journal")));
+    assert.equal((await restarted.propose(f.scan.projectId, f.scan.scanId, finding.id, "new-owner")).id, ready.id);
+    assert.equal((await f.journal.list(f.scan.projectId)).length, 1);
+    const { remediationView, findingSession } = await import("../lib/remediation/view.ts");
+    const view = remediationView(ready);
+    assert.equal("reviewDirectory" in view, false); assert.ok(!JSON.stringify(view).includes("/tmp/"));
+    assert.equal(findingSession([view], source.scanId, finding.id)?.resolved?.[0].id, finding.id);
+    assert.equal(findingSession([view], "another-scan", finding.id), undefined);
+    const { remediationWorkflow } = await import("../lib/remediation/workflow.ts");
+    const { scanStore } = await import("../lib/remediation/scan-store.ts");
+    const { GET, POST } = await import("../app/api/projects/[id]/remediation/route.ts");
+    const originalList = remediationWorkflow.journal.list;
+    const originalPropose = remediationWorkflow.propose;
+    remediationWorkflow.journal.list = async () => [ready];
+    remediationWorkflow.propose = async () => ready;
+    try {
+      const owner = scanStore.register({ ...f.scan, target: "repository" }, undefined);
+      const context = { params: Promise.resolve({ id: f.scan.projectId }) };
+      const endpoint = `http://localhost/api/projects/${f.scan.projectId}/remediation`;
+      for (const response of [await GET(new Request(endpoint), context), await POST(new Request(endpoint, { method: "POST", headers: { "content-type": "application/json", cookie: `hackforge-scan-session=${owner}` }, body: JSON.stringify({ action: "propose", scanId: source.scanId, findingId: finding.id }) }), context)]) {
+        assert.equal(response.status, 200);
+        const body = await response.text(); assert.ok(!body.includes("reviewDirectory")); assert.ok(!body.includes("/tmp/")); assert.ok(!body.includes(workspace));
+      }
+    } finally { remediationWorkflow.journal.list = originalList; remediationWorkflow.propose = originalPropose; }
+  } finally { if (workspace) await rm(workspace, { recursive: true, force: true }); await rm(f.root, { recursive: true, force: true }); }
 });

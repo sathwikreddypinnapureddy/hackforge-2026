@@ -14,6 +14,7 @@ const TARGET_LABELS: Record<DemoTarget, string> = {
 };
 
 export default function Home() {
+  const [mode, setMode] = useState<"projects" | "demo">("projects");
   const [target, setTarget] = useState<DemoTarget>("vulnerable-demo");
   const [result, setResult] = useState<ScanResult | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -87,7 +88,7 @@ export default function Home() {
 
   return (
     <main className="workspace">
-      <a className="skip-link" href="#scan-project">Skip to project scan</a>
+      <a className="skip-link" href={mode === "projects" ? "#projects" : "#scan-project"}>Skip to workspace</a>
       <header className="workspace-header">
         <div className="brand"><span className="brand-mark" aria-hidden="true">H</span><div>
           <p className="brand-name">HackForge<span className="brand-dot">.</span></p>
@@ -96,8 +97,11 @@ export default function Home() {
         <span className="ready-badge"><span aria-hidden="true" className="status-dot" />{scanning ? "SAI Working…" : "SAI Ready"}</span>
       </header>
 
-      <nav className="app-navigation" aria-label="HackForge sections"><a href="#projects">Projects</a><a href="#security">Security</a><a href="#reports">Reports</a><a href="#scan-project">Offline judge demo</a></nav>
-      <ProjectWorkspace />
+      <nav className="app-navigation" aria-label="Application mode">
+        <button aria-pressed={mode === "projects"} onClick={() => setMode("projects")}>Projects</button>
+        <button aria-pressed={mode === "demo"} onClick={() => setMode("demo")}>Demo Lab</button>
+      </nav>
+      {mode === "projects" ? <ProjectWorkspace /> : <>
 
       <section className="intro">
         <p className="eyebrow">Security-first development workspace</p>
@@ -226,6 +230,7 @@ export default function Home() {
         <div><h2>Demo again?</h2><p>Restore the controlled vulnerable project so the demo can be repeated.</p></div>
         <button className="tertiary-button" disabled={scanning} onClick={() => void demoAction("reset-vulnerable-demo")}>Reset Demo</button>
       </section>}
+      </>}
       <footer><strong>HackForge</strong><span>Build Fast. Ship Secure.</span><p>SAI Scanner finds it. SAI Assistant explains it.</p></footer>
     </main>
   );

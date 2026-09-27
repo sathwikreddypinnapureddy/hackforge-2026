@@ -15,10 +15,12 @@ export interface FixProposal {
 }
 export interface RemediationSession {
   id: string; projectId: string; scanId: string; findingIds: string[]; repository: string; sourceCommitSha: string;
-  status: "PROPOSED" | "APPLYING" | "READY_FOR_REVIEW" | "FAILED" | "CANCELLED";
+  status: "PROPOSED" | "APPLYING" | "RESCANNING" | "READY_FOR_REVIEW" | "FAILED" | "CANCELLED";
   proposal?: FixProposal; branchName?: string; reviewDirectory?: string; commit?: CommitRecord; beforeScore: number;
   afterScore?: number; resolved?: Finding[]; remaining?: Finding[]; newFindings?: Finding[]; timeline: TimelineEvent[];
 }
 export type PatchOperation = { kind: "replace"; path: string; before: string; after: string }
   | { kind: "remove"; path: string; before: string }
   | { kind: "write"; path: string; before: string | null; after: string };
+
+export type RemediationView = Omit<RemediationSession, "reviewDirectory">;
