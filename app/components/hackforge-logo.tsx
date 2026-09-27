@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 type HackForgeLogoProps = {
   variant?: "symbol" | "horizontal";
   theme?: "dark" | "light" | "monochrome";
@@ -14,36 +16,19 @@ export function HackForgeLogo({
   decorative = false,
 }: HackForgeLogoProps) {
   const monochrome = theme === "monochrome";
-  const shield = theme === "dark" ? "#79DFB7" : "#0F2233";
-  const terminal = theme === "dark" ? "#0F2233" : "#79DFB7";
+  // Lossless crops of the official logo sheet; never redraw the shield or terminal.
   const symbol = (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 48 48"
+    <Image
+      src={`/brand/hackforge-symbol-${theme}.png`}
+      alt={variant === "symbol" && !decorative ? "HackForge" : ""}
       width={size}
       height={size}
       className={variant === "symbol" ? className : undefined}
-      style={{ display: "block", flexShrink: 0 }}
-      role={variant === "symbol" && !decorative ? "img" : undefined}
-      aria-label={variant === "symbol" && !decorative ? "HackForge" : undefined}
+      style={{ display: "block", flexShrink: 0, objectFit: "contain" }}
       aria-hidden={decorative || variant === "horizontal" ? true : undefined}
-      focusable="false"
-    >
-      <path
-        d="M8 2H40Q46 2 46 8V22C46 34 34 42 24 46C14 42 2 34 2 22V8Q2 2 8 2Z"
-        fill={monochrome ? "none" : shield}
-        stroke={monochrome ? "currentColor" : undefined}
-        strokeWidth={monochrome ? 3 : undefined}
-      />
-      <path
-        d="M14 14L23 22L14 30M27 30H35"
-        fill="none"
-        stroke={monochrome ? "currentColor" : terminal}
-        strokeWidth="4"
-        strokeLinecap="square"
-        strokeLinejoin="miter"
-      />
-    </svg>
+      loading="eager"
+      unoptimized
+    />
   );
 
   if (variant === "symbol") return symbol;
