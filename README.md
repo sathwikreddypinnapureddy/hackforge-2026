@@ -1,11 +1,12 @@
-# HackForge · SAI Phase 3
+# HackForge · SAI Phase 5
 
 HackForge is a security-first development workspace for hackathon teams, built
-during hackUMBC 2026. **The deterministic scanner determines what exists.** This
-phase adds confirmed demo remediation, deterministic rescanning, and before/after
-verification while preserving SAI Assistant explanations powered by Gemini. Gemini never discovers
-findings or controls severity, scores, or status. There is no authentication,
-database, or other sponsor integration.
+during hackUMBC 2026. **The deterministic scanner determines what exists.**
+The controlled demo remains available. Phase 5 adds local projects, read-only
+public GitHub intake, a disposable offline Docker scanner, baseline/rescan
+history, and printable HTML / downloadable JSON reports. Gemini never discovers
+findings or controls severity, scores, or status. There is no authentication or
+database; the real repository workflow is intended for a single local user.
 
 **SAI Scanner finds it. SAI Assistant explains it.** SAI Security Scanner is the
 deterministic scanning engine. SAI Assistant provides AI guidance based on a
@@ -17,6 +18,7 @@ Requires Node.js 22.18+ and Git on PATH. Run from this project directory.
 
 ```bash
 npm ci
+npm run sandbox:build
 npm run dev
 ```
 
@@ -101,7 +103,71 @@ runs before dev, build, and test, or explicitly with
 `npm run setup:demos`. Existing indexes are preserved, so restarting or building
 does not undo remediation. Setup is not called by the API or scanner.
 
-## API
+## Real repository workflow (Phase 5)
+
+Requires Docker Desktop/Engine running with memory, CPU and PID limits supported,
+Node.js 24+ and Git. Build the trusted scanner image after source changes:
+
+```bash
+npm ci
+npm run sandbox:build
+npm run dev
+```
+
+Open **Projects**, enter `https://github.com/owner/repo`, and click **Analyze
+Repository**. Only public GitHub HTTPS URLs are accepted, with an optional
+`.git` suffix. A fresh shallow, no-checkout acquisition obtains the latest
+default-branch commit using a fixed HTTPS Git read proxy with a 100 MiB byte
+budget, no redirects or credentials, a 45-second timeout, no repository
+templates or submodules, and no script execution. It first checks Docker and
+the image; Docker unavailability stops the scan safely. Git's object pack is
+stored under a disposable system temp directory, never in the HackForge source.
+
+The Docker worker has a read-only mount of the acquired Git objects, no network,
+no privileges/capabilities, a nonroot user, a read-only root filesystem, a
+bounded temporary filesystem, and CPU/memory/PID/time limits. It validates the
+tree, rejects symlinks, submodules, special modes, unsafe paths and oversize
+files, then extracts blobs as data. It does not run checkout filters, Git hooks,
+package scripts, Makefiles, Dockerfiles or any repository instructions. The
+existing deterministic detection and scoring modules run on the isolated
+snapshot. The worker sees no `GEMINI_API_KEY` or `.env.local`.
+
+Maximum transfer is 100 MiB; total tree bytes 250 MiB; files 10,000; one file
+1 MiB; depth 30; source text 32 MiB; scan 60 seconds. Generated directories
+and recognized binaries are skipped; the remaining source limit fails closed
+instead of issuing a score for a partial scan. Git index checks still include
+all tracked paths. LFS pointer files and submodules are unsupported. Paths in
+findings become stable opaque `[path:...]` references because filenames can
+contain credentials or repository-authored instructions. Raw source and secrets
+are never saved or sent to Gemini. Scores cover only secret and Git hygiene
+rules; dependency analysis has not been implemented.
+
+Use **Refresh Repository & Rescan** after changing and pushing the public repo.
+Each scan clones a new snapshot and records its SHA. **Run Final Scan** marks
+the latest scan as FINAL; baseline versus latest computes disappeared,
+remaining, and new finding IDs from actual results. Changes in score or status
+never come from SAI Assistant. **Reports** provides printable HTML (use the
+browser's Print / Save PDF) and downloadable JSON. A baseline-only report
+clearly shows no verified improvement yet.
+
+Projects and sanitized scans persist in `.hackforge-data/projects.json` via a
+bounded atomic JSON write. The directory is ignored by Git; records are local
+and have no credentials, source code or raw paths. The `ProjectRepository`
+interface can later be replaced with PostgreSQL. A single Node process handles
+one repository scan at a time; concurrent attempts get a busy response. Without
+authentication, use only on your own machine, not as a public multiuser service.
+The existing 15-minute session-bound SAI explanation service can explain a
+stored verified scan when its project is opened; it receives only fixed rule
+metadata with full path/sample redaction. Repository instructions never become
+prompts.
+
+API: `GET/POST /api/projects`, `GET /api/projects/:id`, `POST
+/api/projects/:id/scan`, `GET /api/projects/:id/report?format=html|json`.
+Creation accepts only `{ "repositoryUrl": "https://github.com/owner/repo" }`;
+scan accepts only `{}` or `{ "scanType": "FINAL" }`. Existing demo APIs remain.
+No API accepts a filesystem path, commands, prompts, source, or credentials.
+
+## Controlled demo API
 
 ```bash
 curl -s http://localhost:3000/api/scan \
@@ -293,8 +359,9 @@ check no console logging, and exercise mocked Gemini before and after scans.
 
 ## Known limitations
 
-- Only the two local, controlled demos can be scanned. No remote URLs, uploads,
-  arbitrary projects, repository history, or service-side credential validation.
+- Only public GitHub repositories and the two controlled demos can be scanned.
+  No private repositories, uploads, arbitrary Git hosts, full Git history,
+  dependency vulnerabilities, or service-side credential validation.
 - Secret rules are format and assignment heuristics, not a full language parser.
   They may flag harmless literals, including fake demo values and comments, and
   may miss obfuscated, split, multiline, encoded, or unfamiliar credentials.
@@ -323,3 +390,26 @@ check no console logging, and exercise mocked Gemini before and after scans.
 
 Phase 3 ends here. Tiger Data, Backboard, DigitalOcean, and other integrations
 are intentionally absent.
+
+## Judge sequence for Phase 5
+
+1. Reset Vulnerable Demo and scan: 37 / 100, four verified findings. Apply Safe
+   Demo Fixes, then Rescan & Verify: 100 / 100. Repeatable offline, no Docker.
+2. With Docker running and `npm run sandbox:build` complete, paste your own
+   public GitHub test repository containing **only fake, nonfunctional** demo
+   credentials. The UI labels the controlled demo credentials nonfunctional;
+   the public test repository must also explicitly say so in its README.
+3. Show the actual baseline commit SHA, score, sanitized findings, and an SAI
+   explanation (Gemini if configured, labeled local guidance otherwise).
+4. Open the initial report. Edit and push the public test repository yourself;
+   HackForge does not push or mutate GitHub.
+5. Click Refresh Repository & Rescan or Run Final Scan. Show the second actual
+   commit SHA, timeline, verified disappeared/remaining/new IDs, score delta,
+   and printable HTML / JSON report. Verify `hackforge-analysis-*` temporary
+   directories were removed and no Docker container remains.
+
+The runner used for this implementation lacked Docker, so the container build
+and a live GitHub-to-Docker demonstration require validation on the local
+Docker-equipped machine. The synthetic two-commit tests exercise scanner,
+redaction, SHA evidence, persistence, comparison, cleanup and reports; they
+do not substitute for running Docker and GitHub on the judge machine.

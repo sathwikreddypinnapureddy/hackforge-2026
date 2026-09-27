@@ -36,6 +36,18 @@ const PROVIDER_RULES: readonly SecretRule[] = [
 
 const REMEDIATION = "Remove the literal from source and tracked configuration. Load it from an environment variable. If a real credential was exposed, revoke or rotate it and remove it from repository history.";
 
+// Used at the host persistence boundary to accept only scanner-authored copy.
+// Repository text can never become a report title, description or remediation.
+export const SECRET_RULE_TEMPLATES = Object.freeze([
+  ...PROVIDER_RULES.map((rule) => ({ category: "SECRET" as const, severity: rule.severity, title: rule.title,
+    description: rule.description, remediation: REMEDIATION })),
+  ...["password", "api_key", "secret"].map((name) => {
+    const rule = assignmentRule(name)!;
+    return { category: "SECRET" as const, severity: rule.severity, title: rule.title,
+      description: rule.description, remediation: REMEDIATION };
+  }),
+]);
+
 function isReference(value: string, quoted: boolean): boolean {
   if (/^(?:\$\{[A-Za-z_][A-Za-z0-9_]*\}|\$[A-Za-z_][A-Za-z0-9_]*|%[A-Za-z_][A-Za-z0-9_]*%)$/.test(value)) return true;
   if (quoted) return false; // A quoted "process.env.KEY" is a literal, not a reference.

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "setup:demos": "node scripts/setup-demos.mjs",
+    "sandbox:build": "node scripts/build-sandbox.mjs",
     "predev": "npm run setup:demos",
     "dev": "next dev --webpack",
     "prebuild": "npm run setup:demos",

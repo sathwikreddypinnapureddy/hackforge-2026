@@ -3,17 +3,18 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { SEVERITIES } from "../lib/scanner/types.ts";
-import type { ScanResult, ScanTarget } from "../lib/scanner/types.ts";
+import type { DemoTarget, ScanResult } from "../lib/scanner/types.ts";
 import { compareScans } from "../lib/demo/comparison.ts";
 import { FindingExplanation } from "./components/finding-explanation.tsx";
+import { ProjectWorkspace } from "./components/project-workspace.tsx";
 
-const TARGET_LABELS: Record<ScanTarget, string> = {
+const TARGET_LABELS: Record<DemoTarget, string> = {
   "vulnerable-demo": "Vulnerable Demo",
   "clean-demo": "Clean Demo",
 };
 
 export default function Home() {
-  const [target, setTarget] = useState<ScanTarget>("vulnerable-demo");
+  const [target, setTarget] = useState<DemoTarget>("vulnerable-demo");
   const [result, setResult] = useState<ScanResult | null>(null);
   const [scanning, setScanning] = useState(false);
   const [activity, setActivity] = useState<string | null>(null);
@@ -95,6 +96,9 @@ export default function Home() {
         <span className="ready-badge"><span aria-hidden="true" className="status-dot" />{scanning ? "SAI Working…" : "SAI Ready"}</span>
       </header>
 
+      <nav className="app-navigation" aria-label="HackForge sections"><a href="#projects">Projects</a><a href="#security">Security</a><a href="#reports">Reports</a><a href="#scan-project">Offline judge demo</a></nav>
+      <ProjectWorkspace />
+
       <section className="intro">
         <p className="eyebrow">Security-first development workspace</p>
         <h1>Check your project<br className="desktop-break" /> before you ship.</h1>
@@ -115,7 +119,7 @@ export default function Home() {
           <div className="target-control">
             <label htmlFor="target">Project</label>
             <select id="target" value={target} disabled={scanning} onChange={(event) => {
-              setTarget(event.target.value as ScanTarget);
+              setTarget(event.target.value as DemoTarget);
               setResult(null); setError(null); setBefore(null); setComparison(null); setFixed(false); setNotice(null);
             }}>
               <option value="vulnerable-demo">Vulnerable Demo</option>
@@ -126,18 +130,18 @@ export default function Home() {
         </form>
         <p className="helper">Two controlled demo projects. All demo credentials are nonfunctional.</p>
         <div role="status" aria-live="polite" className="scan-status">
-          {activity || (result ? `SAI found ${result.findings.length} verified security ${result.findings.length === 1 ? "issue" : "issues"} in ${TARGET_LABELS[result.target]}.` : "Choose a project to get started.")}
+          {activity || (result ? `SAI found ${result.findings.length} verified security ${result.findings.length === 1 ? "issue" : "issues"} in ${TARGET_LABELS[result.target as DemoTarget]}.` : "Choose a project to get started.")}
         </div>
       </section>
       {error && <p role="alert" className="error-message">{error}</p>}
 
-      <section className="score-grid" aria-label="Security overview" aria-busy={scanning}>
+      <section className="score-grid" id="security" aria-label="Security overview" aria-busy={scanning}>
         <div className="posture panel">
           <h2>Project Security Score</h2>
           <div className={`score ${result && result.score < 100 ? "score-warning" : ""}`}>
             {result ? result.score : "—"}<span>/ 100</span>
           </div>
-          <p className="score-status">{result ? (result.findings.length === 0 ? "Ready to ship" : "Needs attention") : "Awaiting your first scan"}</p>
+          <p className="score-status">{result ? (result.findings.length === 0 ? "No supported issues found" : "Needs attention") : "Awaiting your first scan"}</p>
           <p className="helper">Score reflects only checks currently supported by HackForge.</p>
         </div>
         <div className="severity-summary">

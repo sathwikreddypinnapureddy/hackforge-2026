@@ -37,6 +37,7 @@ yarn-error.log*
 !demo-repos/vulnerable-demo/.env
 !demo-repos/clean-demo/.env.example
 demo-repos/.git-data/
+/.hackforge-data/
 
 # vercel
 .vercel

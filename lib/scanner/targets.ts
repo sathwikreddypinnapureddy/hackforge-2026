@@ -1,6 +1,6 @@
 import { lstat, readFile, readdir, realpath } from "node:fs/promises";
 import path from "node:path";
-import type { ScanTarget } from "./types.ts";
+import type { DemoTarget } from "./types.ts";
 
 export class InvalidTargetError extends Error {
   constructor() { super("Choose vulnerable-demo or clean-demo."); }
@@ -10,12 +10,12 @@ export class ScanUnavailableError extends Error {
   constructor() { super("The controlled demo could not be scanned safely. Run npm run setup:demos and try again."); }
 }
 
-export function validateTarget(target: unknown): ScanTarget {
+export function validateTarget(target: unknown): DemoTarget {
   if (target !== "vulnerable-demo" && target !== "clean-demo") throw new InvalidTargetError();
   return target;
 }
 
-export function validateScanInput(input: unknown): ScanTarget {
+export function validateScanInput(input: unknown): DemoTarget {
   if (!input || typeof input !== "object" || Array.isArray(input)) throw new InvalidTargetError();
   const values = input as Record<string, unknown>;
   if (Object.keys(values).length !== 1 || !("target" in values)) throw new InvalidTargetError();
@@ -27,7 +27,7 @@ export function isContained(root: string, candidate: string): boolean {
   return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
 }
 
-export async function resolveTarget(target: unknown): Promise<{ target: ScanTarget; root: string; gitDir: string }> {
+export async function resolveTarget(target: unknown): Promise<{ target: DemoTarget; root: string; gitDir: string }> {
   const validated = validateTarget(target); // Before ANY filesystem access.
   const workspace = await realpath(process.cwd());
   const demoBase = path.join(workspace, "demo-repos");

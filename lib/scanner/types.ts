@@ -2,7 +2,8 @@ export const SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const;
 export type Severity = (typeof SEVERITIES)[number];
 export type FindingStatus = "OPEN" | "RESOLVED" | "ACCEPTED_RISK" | "FALSE_POSITIVE";
 export type FindingCategory = "SECRET" | "GIT_HYGIENE";
-export type ScanTarget = "vulnerable-demo" | "clean-demo";
+export type DemoTarget = "vulnerable-demo" | "clean-demo";
+export type ScanTarget = DemoTarget | "repository";
 
 export interface Finding {
   id: string;
