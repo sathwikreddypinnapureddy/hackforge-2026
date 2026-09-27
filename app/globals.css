@@ -40,7 +40,7 @@ summary { min-height: 44px; padding: 10px 0; cursor: pointer; font-size: 13px; f
 .workspace { width: 100%; }
 .workspace-header { display: flex; align-items: center; gap: 44px; min-height: 86px; padding: 16px 32px; background: var(--navy); color: white; border-bottom: 1px solid #263547; }
 .brand { display: flex; align-items: center; gap: 11px; flex-shrink: 0; }
-.brand-mark { display: grid; place-items: center; width: 36px; height: 40px; border-radius: 9px; background: var(--accent); color: var(--navy); font-size: 24px; font-weight: 850; }
+.brand-mark { display: grid; place-items: center; width: 36px; height: 40px; }
 .brand-name { font-size: 23px; line-height: 1.2; font-weight: 750; letter-spacing: -.8px; }
 .brand-dot { color: var(--accent); }
 .tagline { color: #afbecd; font-size: 11px; margin-top: 3px; }

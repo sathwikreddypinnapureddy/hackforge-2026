@@ -7,6 +7,7 @@ import type { DemoTarget, ScanResult } from "../lib/scanner/types.ts";
 import { compareScans } from "../lib/demo/comparison.ts";
 import { FindingExplanation } from "./components/finding-explanation.tsx";
 import { ProjectWorkspace } from "./components/project-workspace.tsx";
+import { HackForgeLogo } from "./components/hackforge-logo.tsx";
 
 const TARGET_LABELS: Record<DemoTarget, string> = {
   "vulnerable-demo": "Vulnerable Demo",
@@ -90,7 +91,7 @@ export default function Home() {
     <main className="workspace">
       <a className="skip-link" href={mode === "projects" ? "#projects" : "#scan-project"}>Skip to workspace</a>
       <header className="workspace-header">
-        <div className="brand"><span className="brand-mark" aria-hidden="true">H</span><div>
+        <div className="brand"><span className="brand-mark" aria-hidden="true"><HackForgeLogo size={36} decorative /></span><div>
           <p className="brand-name">HackForge<span className="brand-dot">.</span></p>
           <p className="tagline">Build Fast. Ship Secure.</p>
         </div></div>
