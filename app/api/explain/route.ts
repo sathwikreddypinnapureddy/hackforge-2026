@@ -1,12 +1,11 @@
-import { PRIVATE_HEADERS, readBoundedJson } from "../../../lib/http.ts";
+import { PRIVATE_HEADERS, readBoundedJson, sameOrigin } from "../../../lib/http.ts";
 import { scanSession, scanStore, validateExplainInput } from "../../../lib/remediation/scan-store.ts";
 import { explainFinding } from "../../../lib/remediation/service.ts";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request): Promise<Response> {
-  const origin = request.headers.get("origin");
-  if ((origin && origin !== new URL(request.url).origin) || request.headers.get("sec-fetch-site") === "cross-site") {
+  if (!sameOrigin(request)) {
     return Response.json({ error: "Use the HackForge workspace to request an explanation." }, { status: 403, headers: PRIVATE_HEADERS });
   }
   let input;

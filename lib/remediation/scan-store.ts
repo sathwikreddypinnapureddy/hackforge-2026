@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { externallyVisibleHttps } from "../http.ts";
 import type { ScanResult } from "../scanner/types.ts";
 import { buildSanitizedPayload } from "./payload.ts";
 import type { SanitizedFinding } from "./payload.ts";
@@ -51,7 +52,7 @@ export function scanSession(request: Request): string | undefined {
 }
 
 export function sessionCookie(token: string, request: Request): string {
-  return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SCAN_TTL_MS / 1000}${new URL(request.url).protocol === "https:" ? "; Secure" : ""}`;
+  return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SCAN_TTL_MS / 1000}${externallyVisibleHttps(request) ? "; Secure" : ""}`;
 }
 
 export function validateExplainInput(input: unknown): { scanId: string; findingId: string } {

@@ -1,4 +1,4 @@
-import { PRIVATE_HEADERS } from "../../../../../lib/http.ts";
+import { PRIVATE_HEADERS, sameOrigin } from "../../../../../lib/http.ts";
 import { projectError } from "../../../../../lib/projects/http.ts";
 import { validateProjectId } from "../../../../../lib/projects/url.ts";
 import { projectStore } from "../../../../../lib/projects/store.ts";
@@ -6,9 +6,8 @@ import { createSecurityReport, renderSecurityReport } from "../../../../../lib/p
 
 export const runtime = "nodejs";
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
-  const origin = request.headers.get("origin");
   const url = new URL(request.url);
-  if ((origin && origin !== url.origin) || request.headers.get("sec-fetch-site") === "cross-site"
+  if (!sameOrigin(request)
     || [...url.searchParams.keys()].some((key) => key !== "format") || url.searchParams.size > 1) {
     return Response.json({ error: "Invalid report request." }, { status: 403, headers: PRIVATE_HEADERS });
   }

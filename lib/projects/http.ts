@@ -1,11 +1,9 @@
-import { PRIVATE_HEADERS } from "../http.ts";
+import { PRIVATE_HEADERS, sameOrigin as hasSameOrigin } from "../http.ts";
 import { AnalysisError, ERROR_MESSAGES } from "../sandbox/policy.ts";
 
 export const JSON_HEADERS = { ...PRIVATE_HEADERS, "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'" };
 export function sameOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  return (!origin || origin === new URL(request.url).origin) && request.headers.get("sec-fetch-site") !== "cross-site"
-    && !new URL(request.url).search;
+  return hasSameOrigin(request) && !new URL(request.url).search;
 }
 export function projectError(error: unknown) {
   if (error instanceof AnalysisError) {

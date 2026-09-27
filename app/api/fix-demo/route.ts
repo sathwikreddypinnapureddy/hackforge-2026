@@ -1,13 +1,11 @@
 import { mutateDemo, validateDemoInput } from "../../../lib/demo/workflow.ts";
-import { PRIVATE_HEADERS, readBoundedJson } from "../../../lib/http.ts";
+import { PRIVATE_HEADERS, readBoundedJson, sameOrigin } from "../../../lib/http.ts";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request): Promise<Response> {
   // Block cross-origin mutations, including browser form submissions.
-  const origin = request.headers.get("origin");
-  if ((origin && origin !== new URL(request.url).origin)
-    || request.headers.get("sec-fetch-site") === "cross-site"
+  if (!sameOrigin(request)
     || request.headers.get("content-type")?.split(";")[0].trim() !== "application/json"
     || new URL(request.url).search) {
     return Response.json({ error: "Demo actions require same-origin JSON." }, { status: 403, headers: PRIVATE_HEADERS });
