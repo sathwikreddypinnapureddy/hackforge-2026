@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "demo:remediation": "node --conditions=react-server --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/demo-remediation.ts",
     "setup:demos": "node scripts/setup-demos.mjs",
     "sandbox:build": "node scripts/build-sandbox.mjs",
     "predev": "npm run setup:demos",

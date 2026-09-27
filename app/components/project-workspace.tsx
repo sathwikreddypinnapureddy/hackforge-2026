@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import type { Project, ProjectDetail, RepositoryScan } from "../../lib/projects/types.ts";
 import { SEVERITIES } from "../../lib/scanner/types.ts";
 import { compareRepositoryScans } from "../../lib/projects/report.ts";
+import { RemediationPanel, RemediationTimeline } from "./remediation-panel.tsx";
 import { FindingExplanation } from "./finding-explanation.tsx";
 
 function latest(detail: ProjectDetail): RepositoryScan | undefined { return detail.scans.at(-1); }
@@ -98,11 +99,11 @@ export function ProjectWorkspace() {
         {scan.findings.map((finding) => <details className="finding panel" key={`${scan.scanId}:${finding.id}`}><summary className="finding-summary"><span className={`severity severity-${finding.severity.toLowerCase()}`}>{finding.severity}</span>
           <span className="finding-heading"><strong>{finding.title}</strong><code>{finding.filePath}{finding.lineNumber ? `:${finding.lineNumber}` : ""}</code></span><span className="finding-status">OPEN</span><span className="expand-label">Details ⌄</span></summary>
           <div className="finding-body"><p>{finding.description}</p><h3>How to fix it</h3><p>{finding.remediation}</p>
-            <FindingExplanation scanId={scan.scanId} findingId={finding.id} /><details className="technical-details"><summary>Technical details</summary><dl><dt>Category</dt><dd>{finding.category}</dd><dt>Finding ID</dt><dd>{finding.id}</dd><dt>Path reference</dt><dd>{finding.filePath}</dd><dt>Score penalty</dt><dd>{finding.penalty}</dd></dl></details>
+            <FindingExplanation scanId={scan.scanId} findingId={finding.id} /><RemediationPanel projectId={detail.project.id} scanId={scan.scanId} findingId={finding.id} /><details className="technical-details"><summary>Technical details</summary><dl><dt>Category</dt><dd>{finding.category}</dd><dt>Finding ID</dt><dd>{finding.id}</dd><dt>Path reference</dt><dd>{finding.filePath}</dd><dt>Score penalty</dt><dd>{finding.penalty}</dd></dl></details>
           </div></details>)}
         {comparison && <div className="comparison project-comparison"><p className="eyebrow">Baseline vs latest</p><h2>{comparison.previousScore} → {comparison.newScore} / 100</h2><p>{comparison.improvement >= 0 ? "+" : ""}{comparison.improvement} points · {comparison.disappeared.length} verified resolved · {comparison.remaining.length} remaining · {comparison.newFindings.length} new</p>
           <p>Baseline {detail.scans[0].commitSha.slice(0, 12)} → latest {scan.commitSha.slice(0, 12)}</p></div>}
-        <div className="project-history"><h3>Scan history</h3><ol>{detail.scans.map((entry) => <li key={entry.scanId}><strong>{entry.scanType}</strong> · {entry.score} / 100 · {entry.findings.length} findings · <code>{entry.commitSha.slice(0, 12)}</code> · {new Date(entry.scannedAt).toLocaleString()}</li>)}</ol></div>
+        <RemediationTimeline key={detail.project.id} projectId={detail.project.id} /><div className="project-history"><h3>Scan history</h3><ol>{detail.scans.map((entry) => <li key={entry.scanId}><strong>{entry.scanType}</strong> · {entry.score} / 100 · {entry.findings.length} findings · <code>{entry.commitSha.slice(0, 12)}</code> · {new Date(entry.scannedAt).toLocaleString()}</li>)}</ol></div>
         <div id="reports" className="project-reports"><h3>Security improvement report</h3><p>Uses stored deterministic scans and their exact commit IDs.</p><div>
           <a href={`/api/projects/${detail.project.id}/report?format=html`} target="_blank" rel="noopener noreferrer">Open printable report / Save PDF</a>
           <a href={`/api/projects/${detail.project.id}/report?format=json`} download>Download JSON report</a></div></div>
