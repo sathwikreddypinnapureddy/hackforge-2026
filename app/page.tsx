@@ -94,34 +94,35 @@ export default function Home() {
           <p className="brand-name">HackForge<span className="brand-dot">.</span></p>
           <p className="tagline">Build Fast. Ship Secure.</p>
         </div></div>
+        <nav className="app-navigation" aria-label="Application mode">
+          <button type="button" aria-pressed={mode === "projects"} onClick={() => setMode("projects")}>Projects</button>
+          <button type="button" aria-pressed={mode === "demo"} onClick={() => setMode("demo")}>Demo Lab</button>
+        </nav>
         <span className="ready-badge"><span aria-hidden="true" className="status-dot" />{scanning ? "SAI Working…" : "SAI Ready"}</span>
       </header>
 
-      <nav className="app-navigation" aria-label="Application mode">
-        <button aria-pressed={mode === "projects"} onClick={() => setMode("projects")}>Projects</button>
-        <button aria-pressed={mode === "demo"} onClick={() => setMode("demo")}>Demo Lab</button>
-      </nav>
-      {mode === "projects" ? <ProjectWorkspace /> : <>
+      <div hidden={mode !== "projects"}><ProjectWorkspace /></div>
+      {mode === "demo" && <div className="demo-lab">
 
       <section className="intro">
-        <p className="eyebrow">Security-first development workspace</p>
-        <h1>Check your project<br className="desktop-break" /> before you ship.</h1>
-        <p>Find exposed credentials, unsafe Git files, and other security problems before submission.</p>
+        <p className="eyebrow">Controlled judge demonstration</p>
+        <h1>Demo Lab<span className="demo-tag">Synthetic fixtures</span></h1>
+        <p>Uses intentionally vulnerable synthetic fixtures. All credential-like values are fake and nonfunctional.</p>
       </section>
 
       <nav className="progress-flow" aria-label="Security workflow">
         <ol>{["Scan", "Understand", "Fix", "Verify"].map((step, index) => (
-          <li key={step}><span className="step-number" aria-hidden="true">{index + 1}</span><span>{step}</span></li>
+          <li className={index === (comparison ? 3 : fixed ? 2 : result ? 1 : 0) ? "current-step" : ""} key={step}><span className="step-number" aria-hidden="true">{index + 1}</span><span>{step}</span></li>
         ))}</ol>
-        <p>SAI Scanner finds it. SAI Assistant explains it.</p>
+        <p>SAI Scanner finds it. SAI Assistant explains it. HackForge verifies the fix.</p>
       </nav>
 
       <section className="scan-card panel" id="scan-project" aria-labelledby="scan-heading">
-        <h2 id="scan-heading">Scan your project</h2>
-        <p>Check for exposed credentials, unsafe Git files, and other security risks.</p>
+        <h2 id="scan-heading">Scan a demo fixture</h2>
+        <p>Explore the scan, explanation, and verification flow in a controlled environment.</p>
         <form className="scan-controls" onSubmit={(event) => { void scan(event); }}>
           <div className="target-control">
-            <label htmlFor="target">Project</label>
+            <label htmlFor="target">Demo fixture</label>
             <select id="target" value={target} disabled={scanning} onChange={(event) => {
               setTarget(event.target.value as DemoTarget);
               setResult(null); setError(null); setBefore(null); setComparison(null); setFixed(false); setNotice(null);
@@ -130,7 +131,7 @@ export default function Home() {
               <option value="clean-demo">Clean Demo</option>
             </select>
           </div>
-          <button type="submit" disabled={scanning}>Scan Project <span aria-hidden="true">→</span></button>
+          <button type="submit" disabled={scanning}>{scanning ? "Working…" : "Scan Project"} <span aria-hidden="true">→</span></button>
         </form>
         <p className="helper">Two controlled demo projects. All demo credentials are nonfunctional.</p>
         <div role="status" aria-live="polite" className="scan-status">
@@ -139,7 +140,7 @@ export default function Home() {
       </section>
       {error && <p role="alert" className="error-message">{error}</p>}
 
-      <section className="score-grid" id="security" aria-label="Security overview" aria-busy={scanning}>
+      {result && <><section className="score-grid" id="security" aria-label="Demo security overview" aria-busy={scanning}>
         <div className="posture panel">
           <h2>Project Security Score</h2>
           <div className={`score ${result && result.score < 100 ? "score-warning" : ""}`}>
@@ -165,14 +166,14 @@ export default function Home() {
       <section className="findings-section" aria-labelledby="findings-heading">
         <div className="section-heading"><h2 id="findings-heading">Findings</h2>{result && <span>{result.findings.length} open</span>}</div>
         {!result && <div className="empty-state panel">Your results will appear here. Start with Scan Project above.</div>}
-        {result && result.findings.length === 0 && <div className="empty-state panel clean-state"><strong>No supported security issues found.</strong><p>Your latest scan is clear. Review the score note for what this covers.</p></div>}
+        {result && result.findings.length === 0 && <div className="empty-state panel clean-state"><strong>✓ No supported issues detected</strong><p>Your latest scan is clear for the supported checks.</p></div>}
         {result?.findings.map((finding) => (
           <details className="finding panel" key={`${result.scanId}:${finding.id}`}>
             <summary className="finding-summary">
               <span className={`severity severity-${finding.severity.toLowerCase()}`}>{finding.severity}</span>
               <span className="finding-heading"><strong>{finding.title}</strong><code>{finding.filePath}{finding.lineNumber ? `:${finding.lineNumber}` : ""}</code></span>
-              <span className="finding-status">{finding.status}</span>
-              <span className="expand-label" aria-hidden="true">Details <span className="chevron">⌄</span></span>
+              <span className="finding-status">{finding.status} ON FIXTURE</span>
+              <span className="expand-label" aria-hidden="true">›</span>
             </summary>
             <div className="finding-body">
               <h3>What happened?</h3><p>{finding.description}</p>
@@ -185,14 +186,14 @@ export default function Home() {
                 <dl><dt>Category</dt><dd>{finding.category}</dd><dt>Finding ID</dt><dd>{finding.id}</dd><dt>Score penalty</dt><dd>{finding.penalty} points</dd>
                   {finding.lineNumber && <><dt>Line number</dt><dd>{finding.lineNumber}</dd></>}
                   {finding.maskedSample && <><dt>Masked sample</dt><dd><code>{finding.maskedSample}</code></dd></>}
-                  <dt>Scan ID</dt><dd>{result.scanId}</dd><dt>Scanned at</dt><dd>{result.scannedAt}</dd></dl>
+                  <dt>Path reference</dt><dd><code>{finding.filePath}</code></dd><dt>Scan ID</dt><dd>{result.scanId}</dd><dt>Scanned at</dt><dd>{result.scannedAt}</dd></dl>
               </details>
             </div>
           </details>
         ))}
-      </section>
+      </section></>}
 
-      {target === "vulnerable-demo" && <>
+      {target === "vulnerable-demo" && result && <>
         <section className="demo-workflow panel" aria-labelledby="fix-heading">
           <div><p className="eyebrow">Next step · Fix</p><h2 id="fix-heading">Ready to fix these issues?</h2>
             <p>HackForge can safely repair the controlled demo project.</p><p className="helper">You’ll confirm the changes before they are applied.</p>
@@ -204,8 +205,8 @@ export default function Home() {
             {activity === "SAI is verifying the fixes..." && <p role="status">{activity}</p>}</div>
           <button disabled={scanning || !result} onClick={() => void scan(undefined, true)}>Rescan &amp; Verify <span aria-hidden="true">→</span></button>
         </section>
-        {notice && <p className="notice" role="status">{notice}</p>}
       </>}
+      {notice && <p className="notice" role="status">{notice}</p>}
 
       {comparison && (
         <section className="comparison" aria-labelledby="comparison-heading" aria-live="polite">
@@ -230,8 +231,8 @@ export default function Home() {
         <div><h2>Demo again?</h2><p>Restore the controlled vulnerable project so the demo can be repeated.</p></div>
         <button className="tertiary-button" disabled={scanning} onClick={() => void demoAction("reset-vulnerable-demo")}>Reset Demo</button>
       </section>}
-      </>}
-      <footer><strong>HackForge</strong><span>Build Fast. Ship Secure.</span><p>SAI Scanner finds it. SAI Assistant explains it.</p></footer>
+      </div>}
+      <footer><strong>HackForge</strong><span>Build Fast. Ship Secure.</span><p>SAI Scanner finds it. SAI Assistant explains it. HackForge verifies the fix.</p></footer>
     </main>
   );
 }
